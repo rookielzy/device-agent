@@ -9,12 +9,16 @@ import { taskResultSchema } from "../../src/contracts/task-contract.js";
 import {
   ambiguousTaskResult,
   bedroomSensor,
+  expiredConfirmationTaskResult,
   hallwayLight,
+  invalidValueTaskResult,
   langChainSpecificPayload,
   livingRoomAirConditioner,
   offlineKitchenLight,
   pendingControlTaskResult,
+  rejectedTaskResult,
   statusQueryTaskResult,
+  unsupportedTaskResult,
   unavailableTaskResult
 } from "../fixtures/contract-fixtures.js";
 
@@ -70,6 +74,7 @@ describe("task result contract", () => {
 
     expect(parsed.classification).toBe("status_query");
     expect(parsed.executionState).toBe("completed");
+    expect(parsed.outcomeReason).toBe("none");
     expect(parsed.selectedContext.dataItems).toHaveLength(4);
     expect(parsed.timeline.map((event) => event.stage)).toContain("simulated_read");
   });
@@ -87,10 +92,55 @@ describe("task result contract", () => {
     const unavailable = taskResultSchema.parse(unavailableTaskResult);
 
     expect(ambiguous.executionState).toBe("needs_clarification");
+    expect(ambiguous.outcomeReason).toBe("ambiguous_target");
     expect(ambiguous.selectedControlItems).toHaveLength(0);
     expect(ambiguous.selectedContext.candidates.length).toBeGreaterThan(0);
     expect(unavailable.executionState).toBe("unavailable");
+    expect(unavailable.outcomeReason).toBe("device_offline");
     expect(unavailable.pendingControl).toBeUndefined();
+  });
+
+  it("parses blocked outcomes with machine-readable reasons", () => {
+    expect(taskResultSchema.parse(unsupportedTaskResult).outcomeReason).toBe("read_only_control");
+    expect(taskResultSchema.parse(invalidValueTaskResult).outcomeReason).toBe("invalid_control_value");
+    expect(taskResultSchema.parse(rejectedTaskResult).outcomeReason).toBe("control_rejected");
+    expect(taskResultSchema.parse(expiredConfirmationTaskResult).outcomeReason).toBe("pending_control_expired");
+  });
+
+  it("rejects non-success task results without a machine-readable reason", () => {
+    for (const fixture of [
+      ambiguousTaskResult,
+      unavailableTaskResult,
+      rejectedTaskResult,
+      invalidValueTaskResult,
+      expiredConfirmationTaskResult
+    ]) {
+      const missingReason = { ...fixture };
+      delete (missingReason as Partial<typeof fixture>).outcomeReason;
+
+      expect(taskResultSchema.safeParse(missingReason).success).toBe(false);
+      expect(
+        taskResultSchema.safeParse({
+          ...fixture,
+          outcomeReason: "none"
+        }).success
+      ).toBe(false);
+    }
+  });
+
+  it("rejects blocked reasons on completed and pending task results", () => {
+    expect(
+      taskResultSchema.safeParse({
+        ...statusQueryTaskResult,
+        outcomeReason: "device_offline"
+      }).success
+    ).toBe(false);
+    expect(
+      taskResultSchema.safeParse({
+        ...pendingControlTaskResult,
+        outcomeReason: "invalid_control_value"
+      }).success
+    ).toBe(false);
   });
 
   it("rejects malformed task results missing classification or timeline", () => {

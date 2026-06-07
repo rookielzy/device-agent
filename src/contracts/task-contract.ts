@@ -22,6 +22,26 @@ export const executionStateSchema = z.enum([
   "failed"
 ]);
 
+export const taskOutcomeReasonSchema = z.enum([
+  "none",
+  "ambiguous_target",
+  "device_not_found",
+  "device_offline",
+  "unsupported_request",
+  "unsupported_data_item",
+  "unsupported_control_item",
+  "read_only_control",
+  "invalid_control_value",
+  "parse_failure",
+  "pending_control_missing",
+  "pending_control_expired",
+  "pending_control_already_confirmed",
+  "pending_control_already_rejected",
+  "control_rejected",
+  "confirmation_failed",
+  "service_error"
+]);
+
 export const timelineStageSchema = z.enum([
   "request_received",
   "model_interpretation",
@@ -85,6 +105,7 @@ export const taskResultSchema = z
     originalText: z.string().min(1),
     classification: taskClassificationSchema,
     executionState: executionStateSchema,
+    outcomeReason: taskOutcomeReasonSchema.default("none"),
     reply: z.string().min(1),
     userReply: z.string().min(1).optional(),
     plan: structuredPlanSchema,
@@ -96,6 +117,24 @@ export const taskResultSchema = z
   })
   .strict()
   .superRefine((taskResult, ctx) => {
+    const isOrdinaryOutcome = taskResult.executionState === "completed" || taskResult.executionState === "pending_confirmation";
+
+    if (isOrdinaryOutcome && taskResult.outcomeReason !== "none") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["outcomeReason"],
+        message: "completed and pending_confirmation outcomes require outcomeReason none"
+      });
+    }
+
+    if (!isOrdinaryOutcome && taskResult.outcomeReason === "none") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["outcomeReason"],
+        message: "non-success outcomes require a machine-readable outcomeReason"
+      });
+    }
+
     if (taskResult.executionState === "pending_confirmation") {
       if (taskResult.classification !== "control_request") {
         ctx.addIssue({
@@ -133,7 +172,10 @@ export const taskResultSchema = z
 
 export type TaskClassification = z.infer<typeof taskClassificationSchema>;
 export type ExecutionState = z.infer<typeof executionStateSchema>;
+export type TaskOutcomeReason = z.infer<typeof taskOutcomeReasonSchema>;
 export type TimelineStage = z.infer<typeof timelineStageSchema>;
+export type TimelineSource = z.infer<typeof timelineSourceSchema>;
+export type TimelineStatus = z.infer<typeof timelineStatusSchema>;
 export type TimelineEvent = z.infer<typeof timelineEventSchema>;
 export type StructuredPlan = z.infer<typeof structuredPlanSchema>;
 export type PendingControl = z.infer<typeof pendingControlSchema>;
