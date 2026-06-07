@@ -17,15 +17,26 @@ const deviceTargetSchema = z
     phrase: z.string().min(1).optional()
   })
   .strict()
-  .refine((target) => Object.values(target).some((value) => value !== undefined), {
+  .refine(hasDeviceSelector, {
     message: "proposal target must include at least one selector"
   });
 
-const controlTargetSchema = deviceTargetSchema
-  .extend({
+const controlTargetSchema = z
+  .object({
+    deviceId: z.string().min(1).optional(),
+    room: z.string().min(1).optional(),
+    deviceName: z.string().min(1).optional(),
+    deviceType: deviceTypeSchema.optional(),
+    capability: z.string().min(1).optional(),
+    dataItem: z.string().min(1).optional(),
+    controlItem: z.string().min(1).optional(),
+    phrase: z.string().min(1).optional(),
     requestedValue: publicValueSchema
   })
-  .strict();
+  .strict()
+  .refine(hasDeviceSelector, {
+    message: "control proposal target must include at least one device selector"
+  });
 
 export const agentProposalSchema = z.discriminatedUnion("kind", [
   z
@@ -88,4 +99,26 @@ export type AgentInterpreter = {
 
 export function parseAgentProposal(value: unknown): AgentProposal {
   return agentProposalSchema.parse(value);
+}
+
+function hasDeviceSelector(target: {
+  deviceId?: string | undefined;
+  room?: string | undefined;
+  deviceName?: string | undefined;
+  deviceType?: string | undefined;
+  capability?: string | undefined;
+  dataItem?: string | undefined;
+  controlItem?: string | undefined;
+  phrase?: string | undefined;
+}): boolean {
+  return [
+    target.deviceId,
+    target.room,
+    target.deviceName,
+    target.deviceType,
+    target.capability,
+    target.dataItem,
+    target.controlItem,
+    target.phrase
+  ].some((value) => value !== undefined);
 }

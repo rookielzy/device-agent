@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { taskResultSchema } from "../../../src/contracts/task-contract.js";
 import { SimulatedDeviceService } from "../../../src/domain/devices/simulated-device-service.js";
-import { TaskService } from "../../../src/domain/tasks/task-service.js";
+import type {
+  DeviceControlApplyResult,
+  DeviceControlProposalResult,
+  DeviceReadResult
+} from "../../../src/domain/devices/device-results.js";
+import { TaskService, type TaskDeviceService } from "../../../src/domain/tasks/task-service.js";
 import {
   createFixedInterpreter,
   createIdSequence,
@@ -13,7 +18,7 @@ import {
 function createConfirmationService(options: {
   clock?: () => Date;
   pendingControlTtlMs?: number;
-  deviceService?: SimulatedDeviceService;
+  deviceService?: TaskDeviceService;
 } = {}) {
   const clock = options.clock ?? (() => new Date("2026-06-07T09:00:00.000Z"));
 
@@ -40,6 +45,44 @@ function hallwayPower(service: SimulatedDeviceService): boolean | undefined {
   }
 
   return result.dataItems[0]?.value as boolean | undefined;
+}
+
+class FailingApplyDeviceService {
+  readonly inner = new SimulatedDeviceService();
+  failApply = false;
+
+  readStatus(target: Parameters<SimulatedDeviceService["readStatus"]>[0]): DeviceReadResult {
+    return this.inner.readStatus(target);
+  }
+
+  proposeControl(target: Parameters<SimulatedDeviceService["proposeControl"]>[0]): DeviceControlProposalResult {
+    return this.inner.proposeControl(target);
+  }
+
+  applyControl(target: Parameters<SimulatedDeviceService["applyControl"]>[0]): DeviceControlApplyResult {
+    if (this.failApply) {
+      const device = this.inner.debugSnapshot().find((candidate) => candidate.deviceId === "device-light-hallway");
+
+      return {
+        kind: "unavailable",
+        reason: "device_offline",
+        device: {
+          ...device!,
+          availability: {
+            online: false,
+            reason: "Device went offline before confirmation"
+          }
+        },
+        message: "Device went offline before confirmation"
+      };
+    }
+
+    return this.inner.applyControl(target);
+  }
+
+  debugSnapshot(): ReturnType<SimulatedDeviceService["debugSnapshot"]> {
+    return this.inner.debugSnapshot();
+  }
 }
 
 describe("TaskService confirmation lifecycle", () => {
@@ -89,8 +132,29 @@ describe("TaskService confirmation lifecycle", () => {
     const stored = service.getTask(pending.taskId);
     expect(stored.ok).toBe(true);
     if (stored.ok) {
-      expect(stored.task.outcomeReason).toBe("pending_control_already_confirmed");
+      expect(stored.task.executionState).toBe("completed");
+      expect(stored.task.outcomeReason).toBe("none");
     }
+  });
+
+  it("confirms and rejects by pending control id", async () => {
+    const confirmDeviceService = new SimulatedDeviceService();
+    const confirmService = createConfirmationService({ deviceService: confirmDeviceService });
+    const pending = await confirmService.createTask("Turn on the hallway light");
+
+    const confirmed = confirmService.confirmPendingControl(pending.pendingControl!.pendingControlId);
+
+    expect(confirmed.executionState).toBe("completed");
+    expect(hallwayPower(confirmDeviceService)).toBe(true);
+
+    const rejectDeviceService = new SimulatedDeviceService();
+    const rejectService = createConfirmationService({ deviceService: rejectDeviceService });
+    const rejectPending = await rejectService.createTask("Turn on the hallway light");
+
+    const rejected = rejectService.rejectPendingControl(rejectPending.pendingControl!.pendingControlId);
+
+    expect(rejected.executionState).toBe("rejected");
+    expect(hallwayPower(rejectDeviceService)).toBe(false);
   });
 
   it("rejects pending controls without mutation", async () => {
@@ -110,6 +174,13 @@ describe("TaskService confirmation lifecycle", () => {
     expect(confirmAfterReject.executionState).toBe("rejected");
     expect(confirmAfterReject.outcomeReason).toBe("pending_control_already_rejected");
     expect(hallwayPower(deviceService)).toBe(false);
+
+    const stored = service.getTask(pending.taskId);
+    expect(stored.ok).toBe(true);
+    if (stored.ok) {
+      expect(stored.task.executionState).toBe("rejected");
+      expect(stored.task.outcomeReason).toBe("control_rejected");
+    }
   });
 
   it("blocks missing and expired confirmations without mutation", async () => {
@@ -133,6 +204,41 @@ describe("TaskService confirmation lifecycle", () => {
     expect(expired.outcomeReason).toBe("pending_control_expired");
     expect(repeatedExpired.outcomeReason).toBe("pending_control_expired");
     expect(hallwayPower(deviceService)).toBe(false);
+
+    expect(service.getTask("missing-task").ok).toBe(false);
+    const stored = service.getTask(pending.taskId);
+    expect(stored.ok).toBe(true);
+    if (stored.ok) {
+      expect(stored.task.executionState).toBe("pending_confirmation");
+      expect(stored.task.outcomeReason).toBe("none");
+    }
+  });
+
+  it("does not consume pending controls when confirmation-time device apply fails", async () => {
+    const deviceService = new FailingApplyDeviceService();
+    const service = createConfirmationService({
+      deviceService
+    });
+    const pending = await service.createTask("Turn on the hallway light");
+
+    deviceService.failApply = true;
+    const failed = service.confirmTask(pending.taskId);
+    const repeated = service.confirmTask(pending.taskId);
+
+    expect(failed.executionState).toBe("unavailable");
+    expect(failed.outcomeReason).toBe("device_offline");
+    expect(failed.timeline.map((event) => event.stage)).not.toContain("simulated_execution");
+    expect(repeated.executionState).toBe("unavailable");
+    expect(repeated.outcomeReason).toBe("device_offline");
+    expect(hallwayPower(deviceService.inner)).toBe(false);
+    expect(service.pendingControlRepository.getByTaskId(pending.taskId)?.status).toBe("pending");
+
+    const stored = service.getTask(pending.taskId);
+    expect(stored.ok).toBe(true);
+    if (stored.ok) {
+      expect(stored.task.executionState).toBe("pending_confirmation");
+      expect(stored.task.outcomeReason).toBe("none");
+    }
   });
 
   it("blocks offline control creation before a pending control exists", async () => {

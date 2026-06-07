@@ -38,9 +38,14 @@ describe("InMemoryPendingControlRepository", () => {
     const repository = new InMemoryPendingControlRepository();
     repository.create(baseRecord);
 
+    const validation = repository.validatePending(baseRecord.pendingControlId);
     const first = repository.markConfirmed(baseRecord.pendingControlId);
     const second = repository.markConfirmed(baseRecord.pendingControlId);
 
+    expect(validation.ok).toBe(true);
+    if (validation.ok) {
+      expect(validation.record.status).toBe("pending");
+    }
     expect(first.ok).toBe(true);
     if (first.ok) {
       expect(first.record.status).toBe("confirmed");

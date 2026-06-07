@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { agentProposalSchema } from "../../../src/agent/agent-interpreter.js";
 import { taskResultSchema } from "../../../src/contracts/task-contract.js";
+import type { SimulatedDeviceContext } from "../../../src/contracts/device-contract.js";
+import { SimulatedDeviceService } from "../../../src/domain/devices/simulated-device-service.js";
 import { TaskService } from "../../../src/domain/tasks/task-service.js";
 import {
   createFixedClock,
@@ -75,6 +78,31 @@ describe("TaskService status and blocked outcomes", () => {
     expect(result.timeline.some((event) => event.stage === "device_resolution" && event.status === "blocked")).toBe(true);
   });
 
+  it("filters interpreter-supplied ambiguous candidates through the simulated catalog", async () => {
+    const unknownCandidate: SimulatedDeviceContext = {
+      deviceId: "device-fake-provider-leak",
+      displayName: "Provider Supplied Device",
+      room: "garage",
+      type: "generic",
+      availability: {
+        online: true
+      },
+      capabilities: ["read_power"],
+      readableValues: [],
+      writableControls: []
+    };
+    const service = createServiceForProposal({
+      kind: "ambiguous",
+      reason: "Interpreter returned mixed candidates",
+      candidates: [unknownCandidate]
+    });
+
+    const result = await service.createTask("Which device?");
+
+    expect(result.executionState).toBe("needs_clarification");
+    expect(result.selectedContext.candidates).toEqual([]);
+  });
+
   it("maps unsupported data items and not-found requests to distinct reasons", async () => {
     const unsupportedService = createServiceForProposal({
       kind: "status_query",
@@ -104,10 +132,20 @@ describe("TaskService status and blocked outcomes", () => {
 
   it("maps read-only and invalid control proposals without creating pending controls", async () => {
     const readOnlyService = createServiceForProposal(readOnlySensorControlProposal);
-    const invalidService = createServiceForProposal(invalidHallwayControlProposal);
+    const deviceService = new SimulatedDeviceService();
+    const invalidService = new TaskService({
+      interpreter: createFixedInterpreter(invalidHallwayControlProposal),
+      deviceService,
+      clock: createFixedClock(),
+      taskIdGenerator: createIdSequence("task"),
+      pendingControlIdGenerator: createIdSequence("pending"),
+      timelineEventIdGenerator: createIdSequence("evt")
+    });
 
     const readOnly = await readOnlyService.createTask("Set the bedroom sensor temperature to 19");
+    const before = deviceService.readStatus({ room: "hallway", deviceType: "light", dataItem: "power" });
     const invalid = await invalidService.createTask("Set the hallway light power to yes");
+    const after = deviceService.readStatus({ room: "hallway", deviceType: "light", dataItem: "power" });
 
     expect(readOnly.executionState).toBe("unavailable");
     expect(readOnly.outcomeReason).toBe("read_only_control");
@@ -118,6 +156,24 @@ describe("TaskService status and blocked outcomes", () => {
     expect(invalid.outcomeReason).toBe("invalid_control_value");
     expect(invalid.pendingControl).toBeUndefined();
     expect(invalidService.pendingControlRepository.getByTaskId(invalid.taskId)).toBeUndefined();
+    expect(invalid.timeline.map((event) => event.stage)).not.toContain("simulated_execution");
+    expect(before.kind).toBe("read_success");
+    expect(after.kind).toBe("read_success");
+    if (before.kind === "read_success" && after.kind === "read_success") {
+      expect(before.dataItems[0]?.value).toBe(false);
+      expect(after.dataItems[0]?.value).toBe(false);
+    }
+  });
+
+  it("rejects control proposals that include a requested value but no device selector", () => {
+    expect(
+      agentProposalSchema.safeParse({
+        kind: "control_request",
+        target: {
+          requestedValue: true
+        }
+      }).success
+    ).toBe(false);
   });
 
   it("returns a failed parse outcome when interpretation cannot be normalized", async () => {

@@ -107,6 +107,42 @@ describe("task result contract", () => {
     expect(taskResultSchema.parse(expiredConfirmationTaskResult).outcomeReason).toBe("pending_control_expired");
   });
 
+  it("rejects non-success task results without a machine-readable reason", () => {
+    for (const fixture of [
+      ambiguousTaskResult,
+      unavailableTaskResult,
+      rejectedTaskResult,
+      invalidValueTaskResult,
+      expiredConfirmationTaskResult
+    ]) {
+      const missingReason = { ...fixture };
+      delete (missingReason as Partial<typeof fixture>).outcomeReason;
+
+      expect(taskResultSchema.safeParse(missingReason).success).toBe(false);
+      expect(
+        taskResultSchema.safeParse({
+          ...fixture,
+          outcomeReason: "none"
+        }).success
+      ).toBe(false);
+    }
+  });
+
+  it("rejects blocked reasons on completed and pending task results", () => {
+    expect(
+      taskResultSchema.safeParse({
+        ...statusQueryTaskResult,
+        outcomeReason: "device_offline"
+      }).success
+    ).toBe(false);
+    expect(
+      taskResultSchema.safeParse({
+        ...pendingControlTaskResult,
+        outcomeReason: "invalid_control_value"
+      }).success
+    ).toBe(false);
+  });
+
   it("rejects malformed task results missing classification or timeline", () => {
     const missingClassification = { ...statusQueryTaskResult };
     delete (missingClassification as Partial<typeof statusQueryTaskResult>).classification;

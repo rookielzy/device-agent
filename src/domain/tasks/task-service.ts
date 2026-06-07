@@ -54,7 +54,7 @@ const defaultClock: Clock = () => new Date();
 
 export type TaskServiceOptions = {
   interpreter: AgentInterpreter;
-  deviceService?: SimulatedDeviceService;
+  deviceService?: TaskDeviceService;
   taskRepository?: TaskRepository;
   pendingControlRepository?: PendingControlRepository;
   clock?: Clock;
@@ -64,9 +64,11 @@ export type TaskServiceOptions = {
   pendingControlTtlMs?: number;
 };
 
+export type TaskDeviceService = Pick<SimulatedDeviceService, "readStatus" | "proposeControl" | "applyControl" | "debugSnapshot">;
+
 export class TaskService {
   readonly #interpreter: AgentInterpreter;
-  readonly #deviceService: SimulatedDeviceService;
+  readonly #deviceService: TaskDeviceService;
   readonly #taskRepository: TaskRepository;
   readonly #pendingControlRepository: PendingControlRepository;
   readonly #clock: Clock;
@@ -162,7 +164,7 @@ export class TaskService {
             devices: [],
             dataItems: [],
             controlItems: [],
-            candidates: proposal.candidates
+            candidates: this.#filterKnownCandidates(proposal.candidates)
           },
           selectedDataItems: [],
           selectedControlItems: [],
@@ -232,30 +234,125 @@ export class TaskService {
         ...(stored.ok ? { baseTask: stored.task } : {}),
         outcomeReason: "pending_control_missing",
         reply: "I could not find a pending control to confirm.",
-        detail: "No pending control exists for this task"
+        detail: "No pending control exists for this task",
+        persist: false
       });
     }
 
-    const transition = this.#pendingControlRepository.markConfirmed(pending.pendingControlId);
-    if (!transition.ok) {
+    return this.#confirmPendingControlRecord(stored.task, pending);
+  }
+
+  confirmPendingControl(pendingControlId: string): TaskResult {
+    const pending = this.#pendingControlRepository.getByPendingControlId(pendingControlId);
+
+    if (!pending) {
+      return this.#confirmationFailureTask({
+        taskId: pendingControlId,
+        originalText: "Confirm pending control",
+        outcomeReason: "pending_control_missing",
+        reply: "I could not find a pending control to confirm.",
+        detail: "No pending control exists for this pending control id",
+        persist: false
+      });
+    }
+
+    const stored = this.#taskRepository.get(pending.taskId);
+    if (!stored.ok) {
+      return this.#confirmationFailureTask({
+        taskId: pending.taskId,
+        originalText: "Confirm pending control",
+        outcomeReason: "pending_control_missing",
+        reply: "I could not find the task for this pending control.",
+        detail: "Pending control exists without an inspectable task record",
+        persist: false
+      });
+    }
+
+    return this.#confirmPendingControlRecord(stored.task, pending);
+  }
+
+  rejectTask(taskId: string): TaskResult {
+    const stored = this.#taskRepository.get(taskId);
+    const pending = this.#pendingControlRepository.getByTaskId(taskId);
+
+    if (!stored.ok || !pending) {
+      return this.#confirmationFailureTask({
+        taskId,
+        originalText: stored.ok ? stored.task.originalText : "Reject pending control",
+        ...(stored.ok ? { baseTask: stored.task } : {}),
+        outcomeReason: "pending_control_missing",
+        reply: "I could not find a pending control to reject.",
+        detail: "No pending control exists for this task",
+        persist: false
+      });
+    }
+
+    return this.#rejectPendingControlRecord(stored.task, pending);
+  }
+
+  rejectPendingControl(pendingControlId: string): TaskResult {
+    const pending = this.#pendingControlRepository.getByPendingControlId(pendingControlId);
+
+    if (!pending) {
+      return this.#confirmationFailureTask({
+        taskId: pendingControlId,
+        originalText: "Reject pending control",
+        outcomeReason: "pending_control_missing",
+        reply: "I could not find a pending control to reject.",
+        detail: "No pending control exists for this pending control id",
+        persist: false
+      });
+    }
+
+    const stored = this.#taskRepository.get(pending.taskId);
+    if (!stored.ok) {
+      return this.#confirmationFailureTask({
+        taskId: pending.taskId,
+        originalText: "Reject pending control",
+        outcomeReason: "pending_control_missing",
+        reply: "I could not find the task for this pending control.",
+        detail: "Pending control exists without an inspectable task record",
+        persist: false
+      });
+    }
+
+    return this.#rejectPendingControlRecord(stored.task, pending);
+  }
+
+  #confirmPendingControlRecord(storedTask: TaskResult, pending: StoredPendingControl): TaskResult {
+    const validation = this.#pendingControlRepository.validatePending(pending.pendingControlId);
+    if (!validation.ok) {
       return this.#blockedConfirmationTask({
-        baseTask: stored.task,
-        pending: transition.record ?? pending,
-        outcomeReason: pendingFailureToOutcomeReason(transition.reason),
-        reply: replyForPendingFailure(transition.reason),
-        detail: detailForPendingFailure(transition.reason)
+        baseTask: storedTask,
+        pending: validation.record ?? pending,
+        outcomeReason: pendingFailureToOutcomeReason(validation.reason),
+        reply: replyForPendingFailure(validation.reason),
+        detail: detailForPendingFailure(validation.reason),
+        persist: false
       });
     }
 
-    const timeline = this.#timelineFrom(stored.task.timeline);
+    const timeline = this.#timelineFrom(storedTask.timeline);
     timeline.confirmationReceived("succeeded", "User confirmed pending control");
-    const applied = this.#deviceService.applyControl(transition.record.controlTarget);
+    const applied = this.#deviceService.applyControl(validation.record.controlTarget);
 
     if (applied.kind === "control_applied") {
+      const transition = this.#pendingControlRepository.markConfirmed(pending.pendingControlId);
+      if (!transition.ok) {
+        return this.#blockedConfirmationTask({
+          baseTask: storedTask,
+          pending: transition.record ?? pending,
+          outcomeReason: pendingFailureToOutcomeReason(transition.reason),
+          reply: replyForPendingFailure(transition.reason),
+          detail: detailForPendingFailure(transition.reason),
+          persist: false
+        });
+      }
+
       timeline.simulatedExecution("succeeded", `Applied ${applied.controlItem.name} on ${applied.device.displayName}`);
 
       return this.#saveTask({
-        ...stored.task,
+        ...storedTask,
         executionState: "completed",
         outcomeReason: "none",
         reply: `${applied.device.displayName} ${applied.controlItem.name.toLowerCase()} is now ${String(applied.updatedValue)}.`,
@@ -274,8 +371,8 @@ export class TaskService {
     const mapped = mapDeviceFailure(applied);
     appendDeviceFailureTimeline(timeline, applied);
 
-    return this.#saveTask({
-      ...stored.task,
+    return this.#taskResult({
+      ...storedTask,
       executionState: mapped.executionState,
       outcomeReason: mapped.outcomeReason,
       reply: mapped.reply,
@@ -286,37 +383,24 @@ export class TaskService {
     });
   }
 
-  rejectTask(taskId: string): TaskResult {
-    const stored = this.#taskRepository.get(taskId);
-    const pending = this.#pendingControlRepository.getByTaskId(taskId);
-
-    if (!stored.ok || !pending) {
-      return this.#confirmationFailureTask({
-        taskId,
-        originalText: stored.ok ? stored.task.originalText : "Reject pending control",
-        ...(stored.ok ? { baseTask: stored.task } : {}),
-        outcomeReason: "pending_control_missing",
-        reply: "I could not find a pending control to reject.",
-        detail: "No pending control exists for this task"
-      });
-    }
-
+  #rejectPendingControlRecord(storedTask: TaskResult, pending: StoredPendingControl): TaskResult {
     const transition = this.#pendingControlRepository.markRejected(pending.pendingControlId);
     if (!transition.ok) {
       return this.#blockedConfirmationTask({
-        baseTask: stored.task,
+        baseTask: storedTask,
         pending: transition.record ?? pending,
         outcomeReason: pendingFailureToOutcomeReason(transition.reason),
         reply: replyForPendingFailure(transition.reason),
-        detail: detailForPendingFailure(transition.reason)
+        detail: detailForPendingFailure(transition.reason),
+        persist: false
       });
     }
 
-    const timeline = this.#timelineFrom(stored.task.timeline);
+    const timeline = this.#timelineFrom(storedTask.timeline);
     timeline.confirmationReceived("blocked", "User rejected pending control");
 
     return this.#saveTask({
-      ...stored.task,
+      ...storedTask,
       executionState: "rejected",
       outcomeReason: "control_rejected",
       reply: `Okay, I will not change ${transition.record.target.name}.`,
@@ -515,17 +599,18 @@ export class TaskService {
     outcomeReason: TaskOutcomeReason;
     reply: string;
     detail: string;
+    persist: boolean;
   }): TaskResult {
     const timeline = this.#timelineFrom(input.baseTask.timeline);
     timeline.confirmationReceived("blocked", input.detail);
 
-    return this.#saveTask({
+    return this.#maybeSaveTask({
       ...input.baseTask,
       executionState: input.outcomeReason === "pending_control_already_rejected" ? "rejected" : "failed",
       outcomeReason: input.outcomeReason,
       reply: input.reply,
       timeline: finalEvents(timeline, "blocked", "Returned blocked confirmation outcome")
-    });
+    }, input.persist);
   }
 
   #confirmationFailureTask(input: {
@@ -535,6 +620,7 @@ export class TaskService {
     outcomeReason: TaskOutcomeReason;
     reply: string;
     detail: string;
+    persist: boolean;
   }): TaskResult {
     const timeline = input.baseTask ? this.#timelineFrom(input.baseTask.timeline) : this.#newTimeline();
     if (!input.baseTask) {
@@ -542,7 +628,7 @@ export class TaskService {
     }
     timeline.confirmationReceived("blocked", input.detail);
 
-    return this.#saveTask({
+    return this.#maybeSaveTask({
       taskId: input.baseTask?.taskId ?? input.taskId,
       originalText: input.originalText,
       classification: input.baseTask?.classification ?? "control_request",
@@ -563,12 +649,23 @@ export class TaskService {
       selectedDataItems: input.baseTask?.selectedDataItems ?? [],
       selectedControlItems: [],
       timeline: finalEvents(timeline, "blocked", "Returned missing pending-control outcome")
-    });
+    }, input.persist);
   }
 
   #saveTask(task: TaskResult): TaskResult {
+    return this.#taskRepository.save(this.#taskResult(task));
+  }
+
+  #maybeSaveTask(task: TaskResult, persist: boolean): TaskResult {
+    const parsed = this.#taskResult(task);
+
+    return persist ? this.#taskRepository.save(parsed) : parsed;
+  }
+
+  #taskResult(task: TaskResult): TaskResult {
     const parsed = taskResultSchema.parse(stripInvalidPendingControl(task));
-    return this.#taskRepository.save(parsed);
+
+    return parsed;
   }
 
   #newTimeline(): TimelineBuilder {
@@ -583,6 +680,16 @@ export class TaskService {
       clock: this.#clock,
       idGenerator: this.#timelineEventIdGenerator,
       events
+    });
+  }
+
+  #filterKnownCandidates(candidates: SimulatedDeviceContext[]): SimulatedDeviceContext[] {
+    const knownDevices = new Map(this.#deviceService.debugSnapshot().map((device) => [device.deviceId, device]));
+
+    return candidates.flatMap((candidate) => {
+      const known = knownDevices.get(candidate.deviceId);
+
+      return known ? [known] : [];
     });
   }
 }

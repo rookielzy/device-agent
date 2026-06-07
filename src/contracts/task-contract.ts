@@ -117,6 +117,24 @@ export const taskResultSchema = z
   })
   .strict()
   .superRefine((taskResult, ctx) => {
+    const isOrdinaryOutcome = taskResult.executionState === "completed" || taskResult.executionState === "pending_confirmation";
+
+    if (isOrdinaryOutcome && taskResult.outcomeReason !== "none") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["outcomeReason"],
+        message: "completed and pending_confirmation outcomes require outcomeReason none"
+      });
+    }
+
+    if (!isOrdinaryOutcome && taskResult.outcomeReason === "none") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["outcomeReason"],
+        message: "non-success outcomes require a machine-readable outcomeReason"
+      });
+    }
+
     if (taskResult.executionState === "pending_confirmation") {
       if (taskResult.classification !== "control_request") {
         ctx.addIssue({

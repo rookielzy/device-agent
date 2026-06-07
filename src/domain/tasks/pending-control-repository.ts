@@ -11,6 +11,7 @@ export type PendingControlRepository = {
   create(record: StoredPendingControl): StoredPendingControl;
   getByPendingControlId(pendingControlId: string): StoredPendingControl | undefined;
   getByTaskId(taskId: string): StoredPendingControl | undefined;
+  validatePending(pendingControlId: string): PendingControlTransitionResult;
   markConfirmed(pendingControlId: string): PendingControlTransitionResult;
   markRejected(pendingControlId: string): PendingControlTransitionResult;
 };
@@ -38,6 +39,31 @@ export class InMemoryPendingControlRepository implements PendingControlRepositor
     const record = [...this.#records.values()].find((candidate) => candidate.taskId === taskId);
 
     return this.#snapshot(record);
+  }
+
+  validatePending(pendingControlId: string): PendingControlTransitionResult {
+    const record = this.#records.get(pendingControlId);
+
+    if (!record) {
+      return {
+        ok: false,
+        reason: "pending_control_missing"
+      };
+    }
+
+    const blocked = this.#blockedReason(record);
+    if (blocked) {
+      return {
+        ok: false,
+        reason: blocked,
+        record: this.#snapshot(record)
+      };
+    }
+
+    return {
+      ok: true,
+      record: this.#snapshot(record)!
+    };
   }
 
   markConfirmed(pendingControlId: string): PendingControlTransitionResult {

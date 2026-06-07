@@ -75,7 +75,7 @@ Test fixtures in `tests/fixtures/contract-fixtures.ts` carry complete examples w
 
 `rejected` means a pending control request was rejected or cancelled.
 
-`failed` is reserved for unexpected service failures that still return a contract-shaped task result.
+`failed` means the service could not produce a successful or pending outcome but still returned a contract-shaped task result. Expected blocked failures use a specific `outcomeReason`, such as `parse_failure`, `invalid_control_value`, or `pending_control_expired`; unexpected faults should use `service_error` or `confirmation_failed`.
 
 Clients should use `outcomeReason` for branching and analytics instead of parsing `reply` or timeline detail text. `executionState` describes the lifecycle bucket; `outcomeReason` explains why that bucket was reached.
 
