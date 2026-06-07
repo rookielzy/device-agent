@@ -12,7 +12,6 @@ import {
   type TimelineStatus
 } from "../../contracts/task-contract.js";
 import type {
-  PublicValue,
   SelectedDataItem,
   SelectedDeviceContext,
   SimulatedDeviceContext
@@ -20,7 +19,9 @@ import type {
 import {
   type AgentInterpreter,
   type AgentProposal,
-  parseAgentProposal
+  parseAgentProposal,
+  toControlTarget,
+  toDeviceTarget
 } from "../../agent/agent-interpreter.js";
 import type {
   AmbiguousResult,
@@ -33,7 +34,6 @@ import type {
   UnsupportedResult
 } from "../devices/device-results.js";
 import { SimulatedDeviceService } from "../devices/simulated-device-service.js";
-import type { ControlTarget, DeviceTarget } from "../devices/device-types.js";
 import {
   InMemoryPendingControlRepository,
   type PendingControlRepository
@@ -914,35 +914,4 @@ function stripInvalidPendingControl(task: TaskResult): TaskResult {
   const { pendingControl: _pendingControl, ...withoutPending } = task;
 
   return withoutPending;
-}
-
-type LooseDeviceTarget = {
-  deviceId?: DeviceTarget["deviceId"] | undefined;
-  room?: DeviceTarget["room"] | undefined;
-  deviceName?: DeviceTarget["deviceName"] | undefined;
-  deviceType?: DeviceTarget["deviceType"] | undefined;
-  capability?: DeviceTarget["capability"] | undefined;
-  dataItem?: DeviceTarget["dataItem"] | undefined;
-  controlItem?: DeviceTarget["controlItem"] | undefined;
-  phrase?: DeviceTarget["phrase"] | undefined;
-};
-
-function toDeviceTarget(target: LooseDeviceTarget): DeviceTarget {
-  return {
-    ...(target.deviceId !== undefined ? { deviceId: target.deviceId } : {}),
-    ...(target.room !== undefined ? { room: target.room } : {}),
-    ...(target.deviceName !== undefined ? { deviceName: target.deviceName } : {}),
-    ...(target.deviceType !== undefined ? { deviceType: target.deviceType } : {}),
-    ...(target.capability !== undefined ? { capability: target.capability } : {}),
-    ...(target.dataItem !== undefined ? { dataItem: target.dataItem } : {}),
-    ...(target.controlItem !== undefined ? { controlItem: target.controlItem } : {}),
-    ...(target.phrase !== undefined ? { phrase: target.phrase } : {})
-  };
-}
-
-function toControlTarget(target: LooseDeviceTarget & { requestedValue: PublicValue }): ControlTarget {
-  return {
-    ...toDeviceTarget(target),
-    requestedValue: target.requestedValue
-  };
 }
