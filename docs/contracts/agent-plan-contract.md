@@ -4,6 +4,32 @@ The Agent Plan Contract is the public response shape for the text-first IoT Agen
 
 Zod schemas in `src/contracts/task-contract.ts` and `src/contracts/device-contract.ts` are the canonical contract source. Route handlers, domain services, fixtures, and later client renderers should validate against those schemas instead of redefining the response shape.
 
+## HTTP Task API
+
+The Fastify transport exposes the task contract through these V1 routes:
+
+- `POST /tasks` with `{ "text": "..." }` creates a task and returns a schema-valid `TaskResult`.
+- `GET /tasks/:taskId` returns the stored `TaskResult` for a previously created task.
+- `POST /tasks/:taskId/confirm` confirms a pending control by task id.
+- `POST /tasks/:taskId/reject` rejects a pending control by task id.
+- `GET /debug/simulated-devices` returns a read-only developer snapshot of simulated device contexts.
+
+Task-domain outcomes remain task-shaped over HTTP. Ambiguous targets, unsupported requests, offline devices, parse failures, rejected controls, expired pending controls, and duplicate confirmations should return a `TaskResult` with the appropriate `executionState` and `outcomeReason`.
+
+Transport failures are separate from task outcomes. Malformed bodies, unknown inspection targets, unknown routes, method mismatches, and unexpected route errors return an `ApiError` envelope:
+
+```json
+{
+  "error": {
+    "code": "bad_request",
+    "message": "Request validation failed.",
+    "statusCode": 400
+  }
+}
+```
+
+`ApiError` is defined in `src/contracts/api-contract.ts`. Clients should not treat it as a failed task result because it does not describe an interpreted user task.
+
 ## Task Result
 
 A task result contains:
@@ -102,6 +128,8 @@ Control requests are confirmable by default. A pending control contains:
 
 A pending control must not claim that simulated execution happened. The timeline should include `confirmation_required` and should not include `simulated_execution` until a later confirmation flow applies the change.
 
+The HTTP confirmation routes operate on task ids. Confirmation and rejection do not reinterpret the original user text and do not accept a new natural-language body. The service applies simulated mutation only after stored pending-control validation succeeds.
+
 ## Simulated Device Context
 
 Simulated devices are represented through capabilities:
@@ -112,6 +140,8 @@ Simulated devices are represented through capabilities:
 - writable controls with metadata and current value when known
 
 Supported device types for this first contract slice are `light`, `air_conditioner`, `environment_sensor`, and `generic`. Values can be boolean, number, string, or enum metadata. Offline devices may omit current readable values and should explain unavailability through `availability.reason`.
+
+The debug snapshot endpoint returns these same simulated device contexts in a `{ "devices": [...] }` envelope. It is intentionally read-only and exists so developer testers can inspect fake-mode state transitions. It does not add reset, seed editing, write, or real-adapter operations.
 
 ## Provider Boundary
 
