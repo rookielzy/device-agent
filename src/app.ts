@@ -64,16 +64,23 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   app.setNotFoundHandler((request, reply) => {
-    const methodMismatch = isKnownApiPath(request.url, { exposeDebugRoutes });
+    const route = matchApiPath(request.url, { exposeDebugRoutes });
+    const methodMismatch = route !== undefined;
     const statusCode = methodMismatch ? 405 : 404;
     const code = methodMismatch ? "method_not_allowed" : "not_found";
+    if (route) {
+      reply.header("Allow", route.allow.join(", "));
+    }
+
     void reply.status(statusCode).send(createApiError({
       code,
       message: statusCode === 404 ? "Route not found." : "Method not allowed.",
       statusCode,
       details: {
-        method: request.method,
-        url: request.url
+        request: {
+          method: request.method,
+          route: route?.pattern ?? "unmatched"
+        }
       }
     }));
   });
@@ -109,7 +116,9 @@ function shapeRouteError(error: unknown) {
       code: "bad_request",
       message: "Request validation failed.",
       statusCode: 400,
-      details: error.validation
+      details: {
+        issues: error.validation
+      }
     });
   }
 
@@ -126,7 +135,9 @@ function shapeRouteError(error: unknown) {
       code: "bad_request",
       message: "Request validation failed.",
       statusCode: 400,
-      details: error.message
+      details: {
+        reason: "client_http_error"
+      }
     });
   }
 
@@ -163,13 +174,24 @@ function isClientHttpError(error: unknown): error is { statusCode: number; messa
   );
 }
 
-function isKnownApiPath(url: string, options: { exposeDebugRoutes: boolean }): boolean {
+function matchApiPath(url: string, options: { exposeDebugRoutes: boolean }): { pattern: string; allow: string[] } | undefined {
   const path = url.split("?")[0] ?? url;
 
-  return (
-    path === "/tasks" ||
-    (options.exposeDebugRoutes && path === "/debug/simulated-devices") ||
-    /^\/tasks\/[^/]+$/.test(path) ||
-    /^\/tasks\/[^/]+\/(?:confirm|reject)$/.test(path)
-  );
+  if (path === "/tasks") {
+    return { pattern: "/tasks", allow: ["POST"] };
+  }
+
+  if (options.exposeDebugRoutes && path === "/debug/simulated-devices") {
+    return { pattern: "/debug/simulated-devices", allow: ["GET"] };
+  }
+
+  if (/^\/tasks\/[^/]+$/.test(path)) {
+    return { pattern: "/tasks/:taskId", allow: ["GET"] };
+  }
+
+  if (/^\/tasks\/[^/]+\/(?:confirm|reject)$/.test(path)) {
+    return { pattern: "/tasks/:taskId/confirm|reject", allow: ["POST"] };
+  }
+
+  return undefined;
 }

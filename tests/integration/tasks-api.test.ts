@@ -160,8 +160,14 @@ describe("Task HTTP API", () => {
       expect(apiErrorSchema.safeParse(oversizedBody.json()).success).toBe(true);
       expect(apiErrorSchema.parse(unknownTask.json()).error).toMatchObject({
         code: "not_found",
-        statusCode: 404
+        statusCode: 404,
+        details: {
+          resource: {
+            type: "task"
+          }
+        }
       });
+      expect(JSON.stringify(unknownTask.json())).not.toContain("task-missing");
       expect(api.taskService.taskRepository.list()).toEqual([]);
     } finally {
       await api.app.close();

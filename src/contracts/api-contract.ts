@@ -16,24 +16,37 @@ export const apiErrorCodeSchema = z.enum([
   "service_error"
 ]);
 
+export const apiErrorDetailsSchema = z.object({
+  issues: z.unknown().optional(),
+  request: z.object({
+    method: z.string().min(1).optional(),
+    route: z.string().min(1).optional()
+  }).strict().optional(),
+  resource: z.object({
+    type: z.string().min(1)
+  }).strict().optional(),
+  reason: z.string().min(1).optional()
+}).strict();
+
 export const apiErrorSchema = z.object({
   error: z.object({
     code: apiErrorCodeSchema,
     message: z.string().min(1),
     statusCode: z.number().int().min(400).max(599),
-    details: z.unknown().optional()
+    details: apiErrorDetailsSchema.optional()
   }).strict()
 }).strict();
 
 export type CreateTaskBody = z.infer<typeof createTaskBodySchema>;
 export type TaskIdParams = z.infer<typeof taskIdParamsSchema>;
 export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>;
+export type ApiErrorDetails = z.infer<typeof apiErrorDetailsSchema>;
 export type ApiError = z.infer<typeof apiErrorSchema>;
 
 export class ApiRequestValidationError extends Error {
-  readonly details: unknown;
+  readonly details: ApiErrorDetails;
 
-  constructor(message: string, details?: unknown) {
+  constructor(message: string, details: ApiErrorDetails = {}) {
     super(message);
     this.name = "ApiRequestValidationError";
     this.details = details;
@@ -51,7 +64,7 @@ export function createApiError(input: {
   code: ApiErrorCode;
   message: string;
   statusCode: number;
-  details?: unknown;
+  details?: ApiErrorDetails;
 }): ApiError {
   return apiErrorSchema.parse({
     error: {
@@ -77,10 +90,12 @@ export function parseCreateTaskBody(value: unknown): CreateTaskBody {
   const parsed = createTaskBodySchema.safeParse(value);
 
   if (!parsed.success) {
-    throw new ApiRequestValidationError("Request validation failed.", parsed.error.issues.map((issue) => ({
-      path: issue.path.join("."),
-      message: issue.message
-    })));
+    throw new ApiRequestValidationError("Request validation failed.", {
+      issues: parsed.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message
+      }))
+    });
   }
 
   return parsed.data;
@@ -95,22 +110,26 @@ export function parseEmptyRequestBody(value: unknown): void {
     return;
   }
 
-  throw new ApiRequestValidationError("Request body is not accepted for this route.", [
-    {
-      path: "body",
-      message: "Request body is not accepted for this route."
-    }
-  ]);
+  throw new ApiRequestValidationError("Request body is not accepted for this route.", {
+    issues: [
+      {
+        path: "body",
+        message: "Request body is not accepted for this route."
+      }
+    ]
+  });
 }
 
 export function parseTaskIdParams(value: unknown): TaskIdParams {
   const parsed = taskIdParamsSchema.safeParse(value);
 
   if (!parsed.success) {
-    throw new ApiRequestValidationError("Request validation failed.", parsed.error.issues.map((issue) => ({
-      path: issue.path.join("."),
-      message: issue.message
-    })));
+    throw new ApiRequestValidationError("Request validation failed.", {
+      issues: parsed.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message
+      }))
+    });
   }
 
   return parsed.data;

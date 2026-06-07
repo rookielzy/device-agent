@@ -47,9 +47,16 @@ describe("Fastify app construction", () => {
       expect(invalidBody.statusCode).toBe(400);
       expect(unknownRoute.statusCode).toBe(404);
       expect(methodMismatch.statusCode).toBe(405);
+      expect(methodMismatch.headers.allow).toBe("GET");
       expect(apiErrorSchema.safeParse(invalidBody.json()).success).toBe(true);
       expect(apiErrorSchema.safeParse(unknownRoute.json()).success).toBe(true);
       expect(apiErrorSchema.safeParse(methodMismatch.json()).success).toBe(true);
+      expect(apiErrorSchema.parse(methodMismatch.json()).error.details).toMatchObject({
+        request: {
+          method: "PUT",
+          route: "/tasks/:taskId"
+        }
+      });
       expect(api.taskService.taskRepository.list()).toEqual([]);
     } finally {
       await api.app.close();

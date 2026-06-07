@@ -99,6 +99,7 @@ describe("Simulated device debug HTTP API", () => {
       });
 
       expect(response.statusCode).toBe(405);
+      expect(response.headers.allow).toBe("GET");
       expect(apiErrorSchema.parse(response.json()).error).toMatchObject({
         code: "method_not_allowed",
         statusCode: 405

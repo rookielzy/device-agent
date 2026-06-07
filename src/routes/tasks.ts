@@ -54,10 +54,16 @@ function sendTaskResult(reply: FastifyReply, result: TaskResult) {
 }
 
 function taskNotFound(taskId: string): ApiError {
+  void taskId;
+
   return createApiError({
     code: "not_found",
     message: "Task not found.",
     statusCode: 404,
-    details: { taskId }
+    details: {
+      resource: {
+        type: "task"
+      }
+    }
   });
 }
