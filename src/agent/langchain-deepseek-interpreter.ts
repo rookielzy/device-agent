@@ -23,6 +23,7 @@ export type LangChainDeepSeekInterpreterOptions = {
   deviceService?: Pick<SimulatedDeviceService, "readStatus" | "proposeControl" | "debugSnapshot">;
   agent?: AgentInvoker;
   agentFactory?: (input: CreateDeepSeekAgentInput) => AgentInvoker;
+  timeoutMs?: number;
 };
 
 export type CreateDeepSeekAgentInput = {
@@ -33,8 +34,10 @@ export type CreateDeepSeekAgentInput = {
 
 export class LangChainDeepSeekInterpreter implements AgentInterpreter {
   readonly #agent: AgentInvoker;
+  readonly #timeoutMs: number;
 
   constructor(options: LangChainDeepSeekInterpreterOptions) {
+    this.#timeoutMs = options.timeoutMs ?? 30_000;
     this.#agent =
       options.agent ??
       (options.agentFactory ?? createDeepSeekAgent)({
@@ -46,14 +49,17 @@ export class LangChainDeepSeekInterpreter implements AgentInterpreter {
 
   async interpret(input: AgentInterpreterInput): Promise<AgentProposal> {
     try {
-      const result = await this.#agent.invoke({
-        messages: [
-          {
-            role: "user",
-            content: buildInterpreterUserPrompt(input.originalText)
-          }
-        ]
-      });
+      const result = await withTimeout(
+        this.#agent.invoke({
+          messages: [
+            {
+              role: "user",
+              content: buildInterpreterUserPrompt(input.originalText)
+            }
+          ]
+        }),
+        this.#timeoutMs
+      );
 
       if (result.structuredResponse === undefined) {
         return parseFailure("missing_structured_response", "LangChain agent did not return structuredResponse");
@@ -69,12 +75,23 @@ export class LangChainDeepSeekInterpreter implements AgentInterpreter {
         return parseFailure("structured_output_parse_failure", "LangChain could not parse model output as the proposal schema");
       }
 
+      if (error instanceof InterpreterTimeoutError) {
+        return parseFailure("adapter_timeout", "LangChain adapter timed out while interpreting the request");
+      }
+
       if (error instanceof Error) {
         return parseFailure("adapter_error", "LangChain adapter failed to interpret the request");
       }
 
       return parseFailure("adapter_error", "LangChain adapter failed to interpret the request");
     }
+  }
+}
+
+class InterpreterTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`LangChain adapter timed out after ${timeoutMs}ms`);
+    this.name = "InterpreterTimeoutError";
   }
 }
 
@@ -100,4 +117,23 @@ function parseFailure(reason: string, detail: string): AgentProposal {
     detail,
     confidence: 0
   };
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new InterpreterTimeoutError(timeoutMs));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timeout);
+        reject(error);
+      }
+    );
+  });
 }

@@ -133,6 +133,23 @@ describe("LangChainDeepSeekInterpreter contract", () => {
     expect(JSON.stringify(proposal)).not.toContain("request-id-123");
   });
 
+  it("returns a sanitized parse failure when the provider call times out", async () => {
+    const interpreter = createInterpreter({
+      invoke: async () => new Promise(() => undefined),
+      timeoutMs: 5
+    });
+
+    const proposal = await interpreter.interpret({
+      originalText: "Turn on the hallway light"
+    });
+
+    expect(proposal).toMatchObject({
+      kind: "parse_failure",
+      reason: "adapter_timeout",
+      detail: "LangChain adapter timed out while interpreting the request"
+    });
+  });
+
   it("uses injected factory with configured model and api key without reading env at import time", async () => {
     const calls: unknown[] = [];
     const interpreter = new LangChainDeepSeekInterpreter({
@@ -186,10 +203,16 @@ function createInterpreter(options: {
   error?: Error;
   deviceService?: SimulatedDeviceService;
   calls?: Parameters<AgentInvoker["invoke"]>[0][];
+  invoke?: AgentInvoker["invoke"];
+  timeoutMs?: number;
 }) {
   const agent: AgentInvoker = {
     async invoke(input) {
       options.calls?.push(input);
+
+      if (options.invoke) {
+        return options.invoke(input);
+      }
 
       if (options.error) {
         throw options.error;
@@ -205,6 +228,7 @@ function createInterpreter(options: {
     apiKey: "test-key",
     model: "deepseek-test",
     agent,
-    ...(options.deviceService ? { deviceService: options.deviceService } : {})
+    ...(options.deviceService ? { deviceService: options.deviceService } : {}),
+    ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {})
   });
 }

@@ -748,7 +748,7 @@ function formatProposalParseError(error: unknown): string {
   }
 
   if (error instanceof Error) {
-    return error.message;
+    return "Interpreter proposal failed validation";
   }
 
   return "Interpreter proposal failed validation";
