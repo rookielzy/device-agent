@@ -9,8 +9,8 @@
   "packageManager": "pnpm@9.15.9",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/server.js",
-    "dev": "pnpm build && node dist/server.js",
+    "start": "node dist/src/server.js",
+    "dev": "pnpm build && node dist/src/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

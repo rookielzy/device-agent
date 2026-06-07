@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import type { CreateAgentInterpreterOptions } from "../../src/agent/agent-factory.js";
 import type { AgentInterpreter } from "../../src/agent/agent-interpreter.js";
 import { buildApp } from "../../src/app.js";
@@ -7,6 +8,15 @@ import { createRuntimeDependencies, shouldExposeDebugRoutes, startServer } from 
 import { createFixedInterpreter, livingRoomStatusProposal } from "../fixtures/task-fixtures.js";
 
 describe("server runtime wiring", () => {
+  it("points package startup scripts at the emitted server entrypoint", () => {
+    const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
+      scripts: Record<string, string>;
+    };
+
+    expect(packageJson.scripts.start).toBe("node dist/src/server.js");
+    expect(packageJson.scripts.dev).toContain("node dist/src/server.js");
+  });
+
   it("imports app construction without listening or requiring DeepSeek credentials", async () => {
     const app = buildApp({
       config: parseEnv({
