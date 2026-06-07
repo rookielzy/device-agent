@@ -1,4 +1,5 @@
 import type {
+  PublicValue,
   ReadableValue,
   SelectedControlItem,
   SelectedDataItem,
@@ -6,7 +7,6 @@ import type {
   ValueMetadata,
   WritableControl
 } from "../../contracts/device-contract.js";
-import type { PublicValue } from "../../contracts/task-contract.js";
 
 export type DeviceTarget = {
   deviceId?: string;

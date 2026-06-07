@@ -1,9 +1,10 @@
 import type {
+  PublicValue,
   SelectedControlItem,
   SelectedDataItem,
-  SimulatedDeviceContext
+  SimulatedDeviceContext,
+  ValueMetadata
 } from "../../contracts/device-contract.js";
-import type { PublicValue } from "../../contracts/task-contract.js";
 import type {
   AmbiguousResult,
   NotFoundResult,
@@ -269,7 +270,7 @@ function selectReadableItems(device: SimulatedDeviceContext, target: NormalizedT
     itemId: item.itemId,
     name: item.name,
     ...(item.value === undefined ? {} : { value: item.value }),
-    metadata: item.metadata,
+    metadata: cloneMetadata(item.metadata),
     freshness: item.freshness
   }));
 }
@@ -300,8 +301,12 @@ function selectWritableControl(
     controlId: control.controlId,
     name: control.name,
     requestedValue,
-    metadata: control.metadata
+    metadata: cloneMetadata(control.metadata)
   };
+}
+
+function cloneMetadata(metadata: ValueMetadata): ValueMetadata {
+  return structuredClone(metadata);
 }
 
 function hasReadableMatch(device: SimulatedDeviceContext, target: NormalizedTarget): boolean {

@@ -117,4 +117,23 @@ describe("SimulatedDeviceStore", () => {
     expect(later?.readableValues[0]?.value).toBe(false);
     expect(later?.writableControls[0]?.currentValue).toBe(false);
   });
+
+  it("returns selected item metadata copies that cannot mutate store state", () => {
+    const store = new SimulatedDeviceStore();
+    const dataItem = store.selectReadableData("device-light-hallway", ["power"])[0];
+    const controlItem = store.selectWritableControl({
+      deviceId: "device-light-hallway",
+      controlId: "power",
+      requestedValue: true
+    });
+
+    expect(dataItem).toBeDefined();
+    expect(controlItem).toBeDefined();
+    dataItem!.metadata!.label = "Changed Data Label";
+    controlItem!.metadata!.label = "Changed Control Label";
+
+    const later = store.getDevice("device-light-hallway");
+    expect(later?.readableValues[0]?.metadata.label).toBe("Power");
+    expect(later?.writableControls[0]?.metadata.label).toBe("Power");
+  });
 });

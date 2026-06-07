@@ -1,4 +1,5 @@
 import type {
+  PublicValue,
   ReadableValue,
   SelectedControlItem,
   SelectedDataItem,
@@ -6,7 +7,6 @@ import type {
   ValueMetadata,
   WritableControl
 } from "../../contracts/device-contract.js";
-import type { PublicValue } from "../../contracts/task-contract.js";
 import {
   type ControlAppliedResult,
   type DeviceControlApplyResult,
@@ -165,7 +165,7 @@ export class SimulatedDeviceStore {
       itemId: item.itemId,
       name: item.name,
       ...(item.value === undefined ? {} : { value: item.value }),
-      metadata: item.metadata,
+      metadata: cloneMetadata(item.metadata),
       freshness: item.freshness
     };
   }
@@ -176,7 +176,7 @@ export class SimulatedDeviceStore {
       controlId: control.controlId,
       name: control.name,
       requestedValue,
-      metadata: control.metadata
+      metadata: cloneMetadata(control.metadata)
     };
   }
 
@@ -185,21 +185,25 @@ export class SimulatedDeviceStore {
   }
 }
 
+function cloneMetadata(metadata: ValueMetadata): ValueMetadata {
+  return structuredClone(metadata);
+}
+
 export function validateValue(metadata: ValueMetadata, value: PublicValue): ValueValidationResult {
   switch (metadata.kind) {
     case "boolean":
-      return typeof value === "boolean" ? { valid: true } : { valid: false, failure: "boolean_expected", metadata };
+      return typeof value === "boolean" ? { valid: true } : { valid: false, failure: "boolean_expected", metadata: cloneMetadata(metadata) };
     case "number":
       if (typeof value !== "number" || !Number.isFinite(value)) {
-        return { valid: false, failure: "number_expected", metadata };
+        return { valid: false, failure: "number_expected", metadata: cloneMetadata(metadata) };
       }
 
       if (metadata.min !== undefined && value < metadata.min) {
-        return { valid: false, failure: "below_minimum", metadata };
+        return { valid: false, failure: "below_minimum", metadata: cloneMetadata(metadata) };
       }
 
       if (metadata.max !== undefined && value > metadata.max) {
-        return { valid: false, failure: "above_maximum", metadata };
+        return { valid: false, failure: "above_maximum", metadata: cloneMetadata(metadata) };
       }
 
       if (metadata.step !== undefined) {
@@ -207,21 +211,21 @@ export function validateValue(metadata: ValueMetadata, value: PublicValue): Valu
         const scaled = (value - base) / metadata.step;
 
         if (Math.abs(scaled - Math.round(scaled)) > Number.EPSILON * 100) {
-          return { valid: false, failure: "invalid_step", metadata };
+          return { valid: false, failure: "invalid_step", metadata: cloneMetadata(metadata) };
         }
       }
 
       return { valid: true };
     case "string":
-      return typeof value === "string" ? { valid: true } : { valid: false, failure: "string_expected", metadata };
+      return typeof value === "string" ? { valid: true } : { valid: false, failure: "string_expected", metadata: cloneMetadata(metadata) };
     case "enum":
       if (typeof value !== "string") {
-        return { valid: false, failure: "enum_expected", metadata };
+        return { valid: false, failure: "enum_expected", metadata: cloneMetadata(metadata) };
       }
 
       return metadata.options.includes(value)
         ? { valid: true }
-        : { valid: false, failure: "enum_option_not_allowed", metadata };
+        : { valid: false, failure: "enum_option_not_allowed", metadata: cloneMetadata(metadata) };
   }
 }
 

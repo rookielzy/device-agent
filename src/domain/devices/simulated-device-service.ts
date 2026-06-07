@@ -1,4 +1,4 @@
-import type { PublicValue } from "../../contracts/task-contract.js";
+import type { PublicValue } from "../../contracts/device-contract.js";
 import type {
   DeviceControlApplyResult,
   DeviceControlProposalResult,

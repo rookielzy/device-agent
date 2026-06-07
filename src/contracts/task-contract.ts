@@ -138,4 +138,3 @@ export type TimelineEvent = z.infer<typeof timelineEventSchema>;
 export type StructuredPlan = z.infer<typeof structuredPlanSchema>;
 export type PendingControl = z.infer<typeof pendingControlSchema>;
 export type TaskResult = z.infer<typeof taskResultSchema>;
-export type PublicValue = z.infer<typeof publicValueSchema>;

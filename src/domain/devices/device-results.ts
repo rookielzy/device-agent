@@ -1,10 +1,10 @@
 import type {
+  PublicValue,
   SelectedControlItem,
   SelectedDataItem,
   SimulatedDeviceContext,
   ValueMetadata
 } from "../../contracts/device-contract.js";
-import type { PublicValue } from "../../contracts/task-contract.js";
 
 export type DeviceResultKind =
   | "read_success"

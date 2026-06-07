@@ -92,4 +92,30 @@ describe("DeviceResolver", () => {
 
     expect(result.kind).toBe("not_found");
   });
+
+  it("returns selected metadata copies so callers cannot mutate source snapshots", () => {
+    const resolver = new DeviceResolver();
+    const catalog = createSeedCatalog();
+    const readResult = resolver.resolveRead(catalog, {
+      phrase: "Is the hallway light on?"
+    });
+    const controlResult = resolver.resolveControl(catalog, {
+      room: "hallway",
+      deviceType: "light",
+      controlItem: "power",
+      requestedValue: true
+    });
+
+    expect(readResult.kind).toBe("resolved");
+    expect(controlResult.kind).toBe("resolved");
+
+    if (readResult.kind === "resolved" && controlResult.kind === "resolved") {
+      readResult.dataItems[0]!.metadata!.label = "Changed Data Label";
+      controlResult.controlItem!.metadata!.label = "Changed Control Label";
+    }
+
+    const hallway = catalog.find((device) => device.deviceId === "device-light-hallway");
+    expect(hallway?.readableValues[0]?.metadata.label).toBe("Power");
+    expect(hallway?.writableControls[0]?.metadata.label).toBe("Power");
+  });
 });

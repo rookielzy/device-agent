@@ -103,6 +103,7 @@ export const selectedDeviceContextSchema = z.object({
 
 export type DeviceType = z.infer<typeof deviceTypeSchema>;
 export type ValueFreshness = z.infer<typeof valueFreshnessSchema>;
+export type PublicValue = z.infer<typeof publicValueSchema>;
 export type ValueMetadata = z.infer<typeof valueMetadataSchema>;
 export type ReadableValue = z.infer<typeof readableValueSchema>;
 export type WritableControl = z.infer<typeof writableControlSchema>;
