@@ -113,6 +113,24 @@ describe("task result contract", () => {
     ).toBe(false);
   });
 
+  it("rejects pending confirmation without pending control details", () => {
+    const missingPendingControl = { ...pendingControlTaskResult };
+    delete (missingPendingControl as Partial<typeof pendingControlTaskResult>).pendingControl;
+
+    expect(taskResultSchema.safeParse(missingPendingControl).success).toBe(false);
+  });
+
+  it("rejects pending control details on non-pending outcomes", () => {
+    expect(
+      taskResultSchema.safeParse({
+        ...statusQueryTaskResult,
+        classification: "status_query",
+        executionState: "completed",
+        pendingControl: pendingControlTaskResult.pendingControl
+      }).success
+    ).toBe(false);
+  });
+
   it("does not accept LangChain messages or tool-call payloads as public contract fields", () => {
     expect(taskResultSchema.safeParse(langChainSpecificPayload).success).toBe(false);
   });

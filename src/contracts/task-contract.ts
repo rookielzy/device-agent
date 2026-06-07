@@ -94,7 +94,42 @@ export const taskResultSchema = z
     pendingControl: pendingControlSchema.optional(),
     timeline: z.array(timelineEventSchema).min(1)
   })
-  .strict();
+  .strict()
+  .superRefine((taskResult, ctx) => {
+    if (taskResult.executionState === "pending_confirmation") {
+      if (taskResult.classification !== "control_request") {
+        ctx.addIssue({
+          code: "custom",
+          path: ["classification"],
+          message: "pending_confirmation requires control_request classification"
+        });
+      }
+
+      if (!taskResult.pendingControl) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["pendingControl"],
+          message: "pending_confirmation requires pendingControl"
+        });
+      }
+    }
+
+    if (taskResult.pendingControl && taskResult.executionState !== "pending_confirmation") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["pendingControl"],
+        message: "pendingControl is only valid while executionState is pending_confirmation"
+      });
+    }
+
+    if (taskResult.pendingControl && taskResult.classification !== "control_request") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["classification"],
+        message: "pendingControl requires control_request classification"
+      });
+    }
+  });
 
 export type TaskClassification = z.infer<typeof taskClassificationSchema>;
 export type ExecutionState = z.infer<typeof executionStateSchema>;
