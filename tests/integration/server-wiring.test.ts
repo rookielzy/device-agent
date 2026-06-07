@@ -3,7 +3,7 @@ import type { CreateAgentInterpreterOptions } from "../../src/agent/agent-factor
 import type { AgentInterpreter } from "../../src/agent/agent-interpreter.js";
 import { buildApp } from "../../src/app.js";
 import { parseEnv } from "../../src/config/env.js";
-import { createRuntimeDependencies, startServer } from "../../src/server.js";
+import { createRuntimeDependencies, shouldExposeDebugRoutes, startServer } from "../../src/server.js";
 import { createFixedInterpreter, livingRoomStatusProposal } from "../fixtures/task-fixtures.js";
 
 describe("server runtime wiring", () => {
@@ -56,6 +56,68 @@ describe("server runtime wiring", () => {
     });
 
     expect(factory).toHaveBeenCalledOnce();
+  });
+
+  it("gates debug routes for externally bound runtime servers unless explicitly enabled", async () => {
+    const hiddenConfig = parseEnv({
+      HOST: "0.0.0.0",
+      PORT: "3000",
+      AGENT_INTERPRETER_MODE: "fake"
+    });
+    const enabledConfig = parseEnv({
+      HOST: "0.0.0.0",
+      PORT: "3000",
+      AGENT_INTERPRETER_MODE: "fake",
+      ENABLE_DEBUG_SIMULATED_DEVICES: "true"
+    });
+    const hiddenApp = buildApp({
+      dependencies: createRuntimeDependencies(hiddenConfig),
+      exposeDebugRoutes: shouldExposeDebugRoutes(hiddenConfig)
+    });
+    const enabledApp = buildApp({
+      dependencies: createRuntimeDependencies(enabledConfig),
+      exposeDebugRoutes: shouldExposeDebugRoutes(enabledConfig)
+    });
+
+    try {
+      const hidden = await hiddenApp.inject({
+        method: "GET",
+        url: "/debug/simulated-devices"
+      });
+      const enabled = await enabledApp.inject({
+        method: "GET",
+        url: "/debug/simulated-devices"
+      });
+
+      expect(hidden.statusCode).toBe(404);
+      expect(enabled.statusCode).toBe(200);
+    } finally {
+      await hiddenApp.close();
+      await enabledApp.close();
+    }
+  });
+
+  it("keeps debug routes enabled for localhost runtime defaults", async () => {
+    const config = parseEnv({
+      HOST: "127.0.0.1",
+      PORT: "3000",
+      AGENT_INTERPRETER_MODE: "fake"
+    });
+    const app = buildApp({
+      dependencies: createRuntimeDependencies(config),
+      exposeDebugRoutes: shouldExposeDebugRoutes(config)
+    });
+
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: "/debug/simulated-devices"
+      });
+
+      expect(response.statusCode).toBe(200);
+    } finally {
+      await app.close();
+    }
   });
 
   it("listens with configured host and port and surfaces listen failures", async () => {

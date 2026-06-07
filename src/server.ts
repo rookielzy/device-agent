@@ -1,11 +1,10 @@
 import { fileURLToPath } from "node:url";
 import type { FastifyInstance } from "fastify";
-import { buildApp, type AppDependencies } from "./app.js";
+import { buildApp, createAppDependencies, type AppDependencies } from "./app.js";
 import { createAgentInterpreter, type CreateAgentInterpreterOptions } from "./agent/agent-factory.js";
 import type { AgentInterpreter } from "./agent/agent-interpreter.js";
 import { parseEnv, type AppConfig } from "./config/env.js";
 import { SimulatedDeviceService } from "./domain/devices/simulated-device-service.js";
-import { TaskService } from "./domain/tasks/task-service.js";
 
 export type RuntimeDependencyOverrides = {
   simulatedDeviceService?: SimulatedDeviceService;
@@ -21,22 +20,12 @@ export type StartServerOptions = {
 };
 
 export function createRuntimeDependencies(config: AppConfig, overrides: RuntimeDependencyOverrides = {}): AppDependencies {
-  const simulatedDeviceService = overrides.simulatedDeviceService ?? new SimulatedDeviceService();
-  const interpreter =
-    overrides.interpreter ??
-    (overrides.agentInterpreterFactory ?? createAgentInterpreter)({
-      config,
-      deviceService: simulatedDeviceService
-    });
-  const taskService = new TaskService({
-    interpreter,
-    deviceService: simulatedDeviceService
+  return createAppDependencies({
+    config,
+    ...(overrides.simulatedDeviceService ? { simulatedDeviceService: overrides.simulatedDeviceService } : {}),
+    ...(overrides.interpreter ? { interpreter: overrides.interpreter } : {}),
+    agentInterpreterFactory: overrides.agentInterpreterFactory ?? createAgentInterpreter
   });
-
-  return {
-    simulatedDeviceService,
-    taskService
-  };
 }
 
 export async function startServer(options: StartServerOptions = {}): Promise<{
@@ -45,7 +34,8 @@ export async function startServer(options: StartServerOptions = {}): Promise<{
 }> {
   const config = options.config ?? parseEnv(options.env);
   const app = options.app ?? buildApp({
-    dependencies: createRuntimeDependencies(config, options.overrides)
+    dependencies: createRuntimeDependencies(config, options.overrides),
+    exposeDebugRoutes: shouldExposeDebugRoutes(config)
   });
   const address = await app.listen({
     host: config.host,
@@ -74,6 +64,10 @@ function formatStartupError(error: unknown): string {
   }
 
   return "Device Agent API failed to start";
+}
+
+export function shouldExposeDebugRoutes(config: AppConfig): boolean {
+  return config.enableDebugSimulatedDevices || config.host === "127.0.0.1" || config.host === "localhost";
 }
 
 if (isDirectExecution()) {

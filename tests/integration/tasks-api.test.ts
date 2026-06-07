@@ -4,6 +4,7 @@ import { taskResultSchema, type TaskResult } from "../../src/contracts/task-cont
 import {
   livingRoomStatusProposal,
   parseFailureProposal,
+  readOnlySensorControlProposal,
   vagueBedroomStatusProposal
 } from "../fixtures/task-fixtures.js";
 import { createTestApi } from "./api-test-helpers.js";
@@ -89,6 +90,34 @@ describe("Task HTTP API", () => {
     }
   });
 
+  it("returns schema-valid unsupported control outcomes without provider fields", async () => {
+    const api = createTestApi([readOnlySensorControlProposal]);
+
+    try {
+      const response = await api.app.inject({
+        method: "POST",
+        url: "/tasks",
+        payload: { text: "Set the bedroom sensor temperature to 19" }
+      });
+      const result = taskResultSchema.parse(response.json<TaskResult>());
+      const inspected = await api.app.inject({
+        method: "GET",
+        url: `/tasks/${result.taskId}`
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(result.executionState).toBe("unavailable");
+      expect(result.outcomeReason).toBe("read_only_control");
+      expect(result.pendingControl).toBeUndefined();
+      expect(result.timeline.map((event) => event.stage)).not.toContain("simulated_execution");
+      expect(JSON.stringify(result)).not.toContain("tool_calls");
+      expect(JSON.stringify(result)).not.toContain("DeepSeek");
+      expect(taskResultSchema.parse(inspected.json())).toEqual(result);
+    } finally {
+      await api.app.close();
+    }
+  });
+
   it("returns ApiError for malformed bodies and unknown task inspection", async () => {
     const api = createTestApi([livingRoomStatusProposal]);
 
@@ -109,12 +138,26 @@ describe("Task HTTP API", () => {
         method: "GET",
         url: "/tasks/task-missing"
       });
+      const tooLongText = await api.app.inject({
+        method: "POST",
+        url: "/tasks",
+        payload: { text: "x".repeat(4_001) }
+      });
+      const oversizedBody = await api.app.inject({
+        method: "POST",
+        url: "/tasks",
+        payload: { text: "x".repeat(20_000) }
+      });
 
       expect(missingBody.statusCode).toBe(400);
       expect(wrongBody.statusCode).toBe(400);
       expect(unknownTask.statusCode).toBe(404);
+      expect(tooLongText.statusCode).toBe(400);
+      expect(oversizedBody.statusCode).toBe(400);
       expect(apiErrorSchema.safeParse(missingBody.json()).success).toBe(true);
       expect(apiErrorSchema.safeParse(wrongBody.json()).success).toBe(true);
+      expect(apiErrorSchema.safeParse(tooLongText.json()).success).toBe(true);
+      expect(apiErrorSchema.safeParse(oversizedBody.json()).success).toBe(true);
       expect(apiErrorSchema.parse(unknownTask.json()).error).toMatchObject({
         code: "not_found",
         statusCode: 404

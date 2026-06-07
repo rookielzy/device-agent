@@ -1,7 +1,7 @@
-import { z } from "zod";
+import { z, type ZodType } from "zod";
 
 export const createTaskBodySchema = z.object({
-  text: z.string().trim().min(1)
+  text: z.string().trim().min(1).max(4_000)
 }).strict();
 
 export const taskIdParamsSchema = z.object({
@@ -40,6 +40,13 @@ export class ApiRequestValidationError extends Error {
   }
 }
 
+export class ApiResponseValidationError extends Error {
+  constructor() {
+    super("Route response failed public contract validation");
+    this.name = "ApiResponseValidationError";
+  }
+}
+
 export function createApiError(input: {
   code: ApiErrorCode;
   message: string;
@@ -56,6 +63,16 @@ export function createApiError(input: {
   });
 }
 
+export function parseApiResponse<T>(schema: ZodType<T>, value: unknown): T {
+  const parsed = schema.safeParse(value);
+
+  if (!parsed.success) {
+    throw new ApiResponseValidationError();
+  }
+
+  return parsed.data;
+}
+
 export function parseCreateTaskBody(value: unknown): CreateTaskBody {
   const parsed = createTaskBodySchema.safeParse(value);
 
@@ -67,6 +84,23 @@ export function parseCreateTaskBody(value: unknown): CreateTaskBody {
   }
 
   return parsed.data;
+}
+
+export function parseEmptyRequestBody(value: unknown): void {
+  if (value === undefined || value === null) {
+    return;
+  }
+
+  if (typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0) {
+    return;
+  }
+
+  throw new ApiRequestValidationError("Request body is not accepted for this route.", [
+    {
+      path: "body",
+      message: "Request body is not accepted for this route."
+    }
+  ]);
 }
 
 export function parseTaskIdParams(value: unknown): TaskIdParams {

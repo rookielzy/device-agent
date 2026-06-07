@@ -30,7 +30,8 @@ describe("environment configuration", () => {
       interpreterMode: "fake",
       deepseek: {
         model: "deepseek-v4-flash"
-      }
+      },
+      enableDebugSimulatedDevices: false
     });
   });
 
@@ -58,8 +59,14 @@ describe("environment configuration", () => {
       deepseek: {
         apiKey: "test-key",
         model: "deepseek-v4-pro"
-      }
+      },
+      enableDebugSimulatedDevices: false
     });
+  });
+
+  it("parses explicit debug simulated device opt-in", () => {
+    expect(parseEnv({ ENABLE_DEBUG_SIMULATED_DEVICES: "true" }).enableDebugSimulatedDevices).toBe(true);
+    expect(parseEnv({ ENABLE_DEBUG_SIMULATED_DEVICES: "0" }).enableDebugSimulatedDevices).toBe(false);
   });
 
   it("rejects invalid ports and unknown interpreter modes", () => {

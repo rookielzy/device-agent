@@ -84,4 +84,59 @@ describe("Fastify app construction", () => {
       await app.close();
     }
   });
+
+  it("converts invalid debug responses and unexpected route errors into internal ApiError", async () => {
+    const invalidDebugApp = buildApp({
+      dependencies: {
+        taskService: {
+          createTask: async () => ({ taskId: "" }),
+          getTask: () => ({ ok: false, reason: "task_not_found" }),
+          confirmTask: () => ({ taskId: "" }),
+          rejectTask: () => ({ taskId: "" })
+        } as never,
+        simulatedDeviceService: {
+          debugSnapshot: () => [{ deviceId: "" }]
+        } as never
+      }
+    });
+    const throwingApp = buildApp({
+      dependencies: {
+        taskService: {
+          createTask: async () => {
+            throw new Error("raw secret from service");
+          },
+          getTask: () => ({ ok: false, reason: "task_not_found" }),
+          confirmTask: () => ({ taskId: "" }),
+          rejectTask: () => ({ taskId: "" })
+        } as never,
+        simulatedDeviceService: {
+          debugSnapshot: () => []
+        } as never
+      }
+    });
+
+    try {
+      const invalidDebug = await invalidDebugApp.inject({
+        method: "GET",
+        url: "/debug/simulated-devices"
+      });
+      const unexpected = await throwingApp.inject({
+        method: "POST",
+        url: "/tasks",
+        payload: { text: "anything" }
+      });
+
+      expect(invalidDebug.statusCode).toBe(500);
+      expect(apiErrorSchema.parse(invalidDebug.json()).error.code).toBe("response_validation_failed");
+      expect(unexpected.statusCode).toBe(500);
+      expect(apiErrorSchema.parse(unexpected.json()).error).toMatchObject({
+        code: "service_error",
+        statusCode: 500
+      });
+      expect(JSON.stringify(unexpected.json())).not.toContain("raw secret");
+    } finally {
+      await invalidDebugApp.close();
+      await throwingApp.close();
+    }
+  });
 });

@@ -2,19 +2,14 @@ import type { FastifyPluginAsync, FastifyReply } from "fastify";
 import { taskResultSchema } from "../contracts/task-contract.js";
 import {
   createApiError,
+  parseApiResponse,
   parseCreateTaskBody,
+  parseEmptyRequestBody,
   parseTaskIdParams,
   type ApiError
 } from "../contracts/api-contract.js";
 import type { TaskService } from "../domain/tasks/task-service.js";
 import type { TaskResult } from "../contracts/task-contract.js";
-
-export class ResponseValidationError extends Error {
-  constructor() {
-    super("Route response failed public contract validation");
-    this.name = "ResponseValidationError";
-  }
-}
 
 export type TaskRoutesOptions = {
   taskService: TaskService;
@@ -41,25 +36,21 @@ export const registerTaskRoutes: FastifyPluginAsync<TaskRoutesOptions> = async (
 
   app.post("/tasks/:taskId/confirm", async (request, reply) => {
     const params = parseTaskIdParams(request.params);
+    parseEmptyRequestBody(request.body);
 
     return sendTaskResult(reply, options.taskService.confirmTask(params.taskId));
   });
 
   app.post("/tasks/:taskId/reject", async (request, reply) => {
     const params = parseTaskIdParams(request.params);
+    parseEmptyRequestBody(request.body);
 
     return sendTaskResult(reply, options.taskService.rejectTask(params.taskId));
   });
 };
 
 function sendTaskResult(reply: FastifyReply, result: TaskResult) {
-  const parsed = taskResultSchema.safeParse(result);
-
-  if (!parsed.success) {
-    throw new ResponseValidationError();
-  }
-
-  return reply.send(parsed.data);
+  return reply.send(parseApiResponse(taskResultSchema, result));
 }
 
 function taskNotFound(taskId: string): ApiError {

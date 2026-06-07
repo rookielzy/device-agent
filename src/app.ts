@@ -3,14 +3,16 @@ import Fastify, {
   type FastifyInstance,
   type FastifyServerOptions
 } from "fastify";
-import { ApiRequestValidationError, createApiError } from "./contracts/api-contract.js";
+import { ApiRequestValidationError, ApiResponseValidationError, createApiError } from "./contracts/api-contract.js";
 import { createAgentInterpreter } from "./agent/agent-factory.js";
 import type { AgentInterpreter } from "./agent/agent-interpreter.js";
 import { SimulatedDeviceService } from "./domain/devices/simulated-device-service.js";
 import { TaskService, type TaskServiceOptions } from "./domain/tasks/task-service.js";
 import type { AppConfig } from "./config/env.js";
 import { registerSimulatedDeviceRoutes } from "./routes/simulated-devices.js";
-import { ResponseValidationError, registerTaskRoutes } from "./routes/tasks.js";
+import { registerTaskRoutes } from "./routes/tasks.js";
+
+const DEFAULT_BODY_LIMIT_BYTES = 16_384;
 
 export type AppDependencies = {
   taskService: TaskService;
@@ -22,15 +24,17 @@ export type BuildAppOptions = {
   config?: AppConfig;
   interpreter?: AgentInterpreter;
   simulatedDeviceService?: SimulatedDeviceService;
+  agentInterpreterFactory?: typeof createAgentInterpreter;
   taskServiceOptions?: Omit<TaskServiceOptions, "interpreter" | "deviceService">;
   fastify?: FastifyServerOptions;
+  exposeDebugRoutes?: boolean;
 };
 
 export function createAppDependencies(options: Omit<BuildAppOptions, "dependencies" | "fastify"> = {}): AppDependencies {
   const simulatedDeviceService = options.simulatedDeviceService ?? new SimulatedDeviceService({
     ...(options.taskServiceOptions?.clock ? { clock: options.taskServiceOptions.clock } : {})
   });
-  const interpreter = options.interpreter ?? createAgentInterpreter({
+  const interpreter = options.interpreter ?? (options.agentInterpreterFactory ?? createAgentInterpreter)({
     config: requireConfig(options.config),
     deviceService: simulatedDeviceService
   });
@@ -47,8 +51,12 @@ export function createAppDependencies(options: Omit<BuildAppOptions, "dependenci
 }
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
-  const app = Fastify(options.fastify ?? {});
+  const app = Fastify({
+    bodyLimit: DEFAULT_BODY_LIMIT_BYTES,
+    ...(options.fastify ?? {})
+  });
   const dependencies = options.dependencies ?? createAppDependencies(options);
+  const exposeDebugRoutes = options.exposeDebugRoutes ?? true;
 
   app.setErrorHandler((error, _request, reply) => {
     const shaped = shapeRouteError(error);
@@ -56,7 +64,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   app.setNotFoundHandler((request, reply) => {
-    const methodMismatch = isKnownApiPath(request.url);
+    const methodMismatch = isKnownApiPath(request.url, { exposeDebugRoutes });
     const statusCode = methodMismatch ? 405 : 404;
     const code = methodMismatch ? "method_not_allowed" : "not_found";
     void reply.status(statusCode).send(createApiError({
@@ -71,7 +79,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   app.register(registerTaskRoutes, { taskService: dependencies.taskService });
-  app.register(registerSimulatedDeviceRoutes, { simulatedDeviceService: dependencies.simulatedDeviceService });
+  if (exposeDebugRoutes) {
+    app.register(registerSimulatedDeviceRoutes, { simulatedDeviceService: dependencies.simulatedDeviceService });
+  }
 
   return app;
 }
@@ -85,18 +95,6 @@ function requireConfig(config: AppConfig | undefined): AppConfig {
 }
 
 function shapeRouteError(error: unknown) {
-  if (isZodError(error)) {
-    return createApiError({
-      code: "bad_request",
-      message: "Request validation failed.",
-      statusCode: 400,
-      details: error.issues.map((issue) => ({
-        path: issue.path.join("."),
-        message: issue.message
-      }))
-    });
-  }
-
   if (error instanceof ApiRequestValidationError) {
     return createApiError({
       code: "bad_request",
@@ -115,7 +113,7 @@ function shapeRouteError(error: unknown) {
     });
   }
 
-  if (error instanceof ResponseValidationError) {
+  if (error instanceof ApiResponseValidationError || isZodError(error)) {
     return createApiError({
       code: "response_validation_failed",
       message: "Route response failed public contract validation.",
@@ -165,12 +163,12 @@ function isClientHttpError(error: unknown): error is { statusCode: number; messa
   );
 }
 
-function isKnownApiPath(url: string): boolean {
+function isKnownApiPath(url: string, options: { exposeDebugRoutes: boolean }): boolean {
   const path = url.split("?")[0] ?? url;
 
   return (
     path === "/tasks" ||
-    path === "/debug/simulated-devices" ||
+    (options.exposeDebugRoutes && path === "/debug/simulated-devices") ||
     /^\/tasks\/[^/]+$/.test(path) ||
     /^\/tasks\/[^/]+\/(?:confirm|reject)$/.test(path)
   );

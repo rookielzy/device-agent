@@ -14,7 +14,7 @@ POST /tasks/:taskId/reject
 GET /debug/simulated-devices
 ```
 
-`POST /tasks` accepts a JSON body with non-empty text:
+`POST /tasks` accepts a JSON body with non-empty text up to 4,000 characters:
 
 ```bash
 curl -s http://127.0.0.1:3000/tasks \
@@ -35,7 +35,7 @@ curl -s -X POST http://127.0.0.1:3000/tasks/task-001/confirm
 curl -s -X POST http://127.0.0.1:3000/tasks/task-001/reject
 ```
 
-`GET /debug/simulated-devices` returns a read-only snapshot of the in-memory simulated device state used by the task routes. It is a developer V1 support surface, not a real IoT adapter API.
+`GET /debug/simulated-devices` returns a read-only snapshot of the in-memory simulated device state used by the task routes. It is a developer V1 support surface, not a real IoT adapter API. Runtime startup exposes it by default only for localhost hosts; set `ENABLE_DEBUG_SIMULATED_DEVICES=true` when deliberately exposing it from another host binding.
 
 ## Running Locally
 
@@ -53,6 +53,7 @@ HOST=127.0.0.1
 PORT=3000
 AGENT_INTERPRETER_MODE=fake
 DEEPSEEK_MODEL=deepseek-v4-flash
+ENABLE_DEBUG_SIMULATED_DEVICES=false
 ```
 
 ## Interpreter Modes

@@ -8,7 +8,7 @@ Zod schemas in `src/contracts/task-contract.ts` and `src/contracts/device-contra
 
 The Fastify transport exposes the task contract through these V1 routes:
 
-- `POST /tasks` with `{ "text": "..." }` creates a task and returns a schema-valid `TaskResult`.
+- `POST /tasks` with `{ "text": "..." }` creates a task and returns a schema-valid `TaskResult`. Text is capped at 4,000 characters.
 - `GET /tasks/:taskId` returns the stored `TaskResult` for a previously created task.
 - `POST /tasks/:taskId/confirm` confirms a pending control by task id.
 - `POST /tasks/:taskId/reject` rejects a pending control by task id.
@@ -141,7 +141,7 @@ Simulated devices are represented through capabilities:
 
 Supported device types for this first contract slice are `light`, `air_conditioner`, `environment_sensor`, and `generic`. Values can be boolean, number, string, or enum metadata. Offline devices may omit current readable values and should explain unavailability through `availability.reason`.
 
-The debug snapshot endpoint returns these same simulated device contexts in a `{ "devices": [...] }` envelope. It is intentionally read-only and exists so developer testers can inspect fake-mode state transitions. It does not add reset, seed editing, write, or real-adapter operations.
+The debug snapshot endpoint returns these same simulated device contexts in a `{ "devices": [...] }` envelope. It is intentionally read-only and exists so developer testers can inspect fake-mode state transitions. It does not add reset, seed editing, write, or real-adapter operations. Runtime startup exposes it by default only for localhost hosts; non-local bindings must opt in with `ENABLE_DEBUG_SIMULATED_DEVICES=true`.
 
 ## Provider Boundary
 

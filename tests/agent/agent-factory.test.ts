@@ -28,7 +28,8 @@ describe("createAgentInterpreter", () => {
       deepseek: {
         apiKey: "test-key",
         model: "deepseek-test"
-      }
+      },
+      enableDebugSimulatedDevices: false
     };
     const interpreter = createAgentInterpreter({
       config,
@@ -65,7 +66,8 @@ describe("createAgentInterpreter", () => {
       deepseek: {
         apiKey: "test-key",
         model: "deepseek-test"
-      }
+      },
+      enableDebugSimulatedDevices: false
     };
     const deviceService = {
       readStatus(): DeviceReadResult {

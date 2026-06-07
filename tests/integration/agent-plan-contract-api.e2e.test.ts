@@ -10,24 +10,8 @@ import { createFixedClock, createIdSequence } from "../fixtures/task-fixtures.js
 import { sampleUtterances } from "../fixtures/sample-utterances.js";
 
 describe("Agent Plan Contract HTTP acceptance examples", () => {
-  it("covers status, confirmed control, unconfirmed/rejected control, offline control, and ambiguity over HTTP", async () => {
-    const clock = createFixedClock();
-    const simulatedDeviceService = new SimulatedDeviceService({ clock });
-    const taskService = new TaskService({
-      interpreter: new FakeInterpreter(),
-      deviceService: simulatedDeviceService,
-      clock,
-      taskIdGenerator: createIdSequence("task"),
-      pendingControlIdGenerator: createIdSequence("pending"),
-      timelineEventIdGenerator: createIdSequence("evt")
-    });
-    const app = buildApp({
-      dependencies: {
-        taskService,
-        simulatedDeviceService
-      }
-    });
-
+  it("covers status, confirmed control, offline control, and ambiguity over HTTP", async () => {
+    const app = createAcceptanceApp();
     try {
       const status = await createTask(app, textFor("ae1-living-room-ac-status"));
       expect(status.executionState).toBe("completed");
@@ -51,18 +35,6 @@ describe("Agent Plan Contract HTTP acceptance examples", () => {
       expect(hallwayPower(beforeConfirm)).toBe(false);
       expect(hallwayPower(afterConfirm)).toBe(true);
 
-      const unconfirmedPending = await createTask(app, textFor("ae3-unconfirmed-hallway-light"));
-      const afterSecondPending = await debugDevices(app);
-      const rejected = taskResultSchema.parse((await app.inject({
-        method: "POST",
-        url: `/tasks/${unconfirmedPending.taskId}/reject`
-      })).json<TaskResult>());
-      const afterReject = await debugDevices(app);
-      expect(unconfirmedPending.executionState).toBe("pending_confirmation");
-      expect(rejected.executionState).toBe("rejected");
-      expect(hallwayPower(afterSecondPending)).toBe(true);
-      expect(hallwayPower(afterReject)).toBe(true);
-
       const offline = await createTask(app, textFor("ae4-offline-kitchen-light"));
       expect(offline.executionState).toBe("unavailable");
       expect(offline.outcomeReason).toBe("device_offline");
@@ -80,7 +52,50 @@ describe("Agent Plan Contract HTTP acceptance examples", () => {
       await app.close();
     }
   });
+
+  it("covers unconfirmed and rejected controls without prior mutation", async () => {
+    const app = createAcceptanceApp();
+
+    try {
+      const beforePending = await debugDevices(app);
+      const unconfirmedPending = await createTask(app, textFor("ae3-unconfirmed-hallway-light"));
+      const afterPending = await debugDevices(app);
+      const rejected = taskResultSchema.parse((await app.inject({
+        method: "POST",
+        url: `/tasks/${unconfirmedPending.taskId}/reject`
+      })).json<TaskResult>());
+      const afterReject = await debugDevices(app);
+
+      expect(hallwayPower(beforePending)).toBe(false);
+      expect(unconfirmedPending.executionState).toBe("pending_confirmation");
+      expect(rejected.executionState).toBe("rejected");
+      expect(hallwayPower(afterPending)).toBe(false);
+      expect(hallwayPower(afterReject)).toBe(false);
+    } finally {
+      await app.close();
+    }
+  });
 });
+
+function createAcceptanceApp(): FastifyInstance {
+  const clock = createFixedClock();
+  const simulatedDeviceService = new SimulatedDeviceService({ clock });
+  const taskService = new TaskService({
+    interpreter: new FakeInterpreter(),
+    deviceService: simulatedDeviceService,
+    clock,
+    taskIdGenerator: createIdSequence("task"),
+    pendingControlIdGenerator: createIdSequence("pending"),
+    timelineEventIdGenerator: createIdSequence("evt")
+  });
+
+  return buildApp({
+    dependencies: {
+      taskService,
+      simulatedDeviceService
+    }
+  });
+}
 
 async function createTask(app: FastifyInstance, text: string): Promise<TaskResult> {
   const response = await app.inject({

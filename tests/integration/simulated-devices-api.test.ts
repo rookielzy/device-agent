@@ -32,7 +32,8 @@ describe("Simulated device debug HTTP API", () => {
         "device-light-kitchen"
       ]));
       expect(kitchenLight(snapshot.devices)?.availability).toMatchObject({
-        online: false
+        online: false,
+        reason: expect.any(String)
       });
       expect(JSON.stringify(snapshot)).not.toContain("provider");
       expect(JSON.stringify(snapshot)).not.toContain("iot_adapter");

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { apiErrorSchema } from "../../src/contracts/api-contract.js";
 import { taskResultSchema, type TaskResult } from "../../src/contracts/task-contract.js";
 import type { SimulatedDeviceService } from "../../src/domain/devices/simulated-device-service.js";
 import { createMutableClock, hallwayLightOnProposal } from "../fixtures/task-fixtures.js";
@@ -122,6 +123,47 @@ describe("Task confirmation HTTP API", () => {
       expect(hallwayPower(api.simulatedDeviceService)).toBe(false);
     } finally {
       await api.app.close();
+    }
+  });
+
+  it("rejects confirmation and rejection request bodies before applying pending controls", async () => {
+    const confirmApi = createTestApi([hallwayLightOnProposal]);
+    const rejectApi = createTestApi([hallwayLightOnProposal]);
+
+    try {
+      const confirmPending = taskResultSchema.parse((await confirmApi.app.inject({
+        method: "POST",
+        url: "/tasks",
+        payload: { text: "Turn on the hallway light" }
+      })).json<TaskResult>());
+      const rejectPending = taskResultSchema.parse((await rejectApi.app.inject({
+        method: "POST",
+        url: "/tasks",
+        payload: { text: "Turn on the hallway light" }
+      })).json<TaskResult>());
+
+      const confirmWithBody = await confirmApi.app.inject({
+        method: "POST",
+        url: `/tasks/${confirmPending.taskId}/confirm`,
+        payload: { text: "Actually turn off something else" }
+      });
+      const rejectWithBody = await rejectApi.app.inject({
+        method: "POST",
+        url: `/tasks/${rejectPending.taskId}/reject`,
+        payload: { text: "Reject a different request" }
+      });
+
+      expect(confirmWithBody.statusCode).toBe(400);
+      expect(rejectWithBody.statusCode).toBe(400);
+      expect(apiErrorSchema.parse(confirmWithBody.json()).error.code).toBe("bad_request");
+      expect(apiErrorSchema.parse(rejectWithBody.json()).error.code).toBe("bad_request");
+      expect(hallwayPower(confirmApi.simulatedDeviceService)).toBe(false);
+      expect(hallwayPower(rejectApi.simulatedDeviceService)).toBe(false);
+      expect(confirmApi.taskService.pendingControlRepository.getByTaskId(confirmPending.taskId)?.status).toBe("pending");
+      expect(rejectApi.taskService.pendingControlRepository.getByTaskId(rejectPending.taskId)?.status).toBe("pending");
+    } finally {
+      await confirmApi.app.close();
+      await rejectApi.app.close();
     }
   });
 });
