@@ -35,7 +35,9 @@ describe("InMemoryPendingControlRepository", () => {
   });
 
   it("confirms a pending control exactly once", () => {
-    const repository = new InMemoryPendingControlRepository();
+    const repository = new InMemoryPendingControlRepository({
+      clock: () => new Date("2026-06-07T09:05:00.000Z")
+    });
     repository.create(baseRecord);
 
     const validation = repository.validatePending(baseRecord.pendingControlId);
@@ -57,7 +59,9 @@ describe("InMemoryPendingControlRepository", () => {
   });
 
   it("rejects a pending control exactly once", () => {
-    const repository = new InMemoryPendingControlRepository();
+    const repository = new InMemoryPendingControlRepository({
+      clock: () => new Date("2026-06-07T09:05:00.000Z")
+    });
     repository.create(baseRecord);
 
     const first = repository.markRejected(baseRecord.pendingControlId);

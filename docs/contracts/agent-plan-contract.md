@@ -136,6 +136,16 @@ DEEPSEEK_MODEL=deepseek-v4-flash
 
 Configuration parsing rejects live DeepSeek mode when the API key is missing.
 
+## Interpreter Adapter Boundary
+
+`src/agent/agent-interpreter.ts` is the provider-neutral boundary consumed by `TaskService`. The deterministic fake interpreter and the LangChain DeepSeek adapter both return normalized `AgentProposal` values:
+
+- Fake mode maps representative sample utterances without network access or credentials.
+- DeepSeek mode uses LangChain `createAgent`, `ChatDeepSeek`, simulated-device tools, and structured output.
+- Device tools can resolve/read status and propose controls, but they must not apply controls or create pending controls.
+- Malformed or missing structured model output becomes a `parse_failure` proposal.
+- Public task results must not include LangChain messages, tool calls, run ids, raw DeepSeek payloads, or provider metadata.
+
 ## V1 Boundaries
 
 V1 contracts describe simulated devices only. They do not promise real IoT adapter behavior, production persistence, voice input or output, automatic device control, frontend rendering, household permission checks, or real audit-retention policy.
