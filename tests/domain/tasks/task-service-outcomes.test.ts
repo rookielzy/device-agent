@@ -191,9 +191,20 @@ describe("TaskService status and blocked outcomes", () => {
       taskIdGenerator: createIdSequence("task"),
       timelineEventIdGenerator: createIdSequence("evt")
     });
+    const throwingInterpreterService = new TaskService({
+      interpreter: {
+        interpret: () => {
+          throw new Error("raw provider payload tool_calls request-id-123");
+        }
+      },
+      clock: createFixedClock(),
+      taskIdGenerator: createIdSequence("task"),
+      timelineEventIdGenerator: createIdSequence("evt")
+    });
 
     const reported = await reportedFailureService.createTask("nonsense");
     const invalidShape = await invalidShapeService.createTask("turn something");
+    const thrown = await throwingInterpreterService.createTask("turn something");
 
     expect(reported.executionState).toBe("failed");
     expect(reported.outcomeReason).toBe("parse_failure");
@@ -202,5 +213,10 @@ describe("TaskService status and blocked outcomes", () => {
     expect(invalidShape.executionState).toBe("failed");
     expect(invalidShape.outcomeReason).toBe("parse_failure");
     expect(taskResultSchema.safeParse(invalidShape).success).toBe(true);
+
+    expect(thrown.executionState).toBe("failed");
+    expect(thrown.outcomeReason).toBe("parse_failure");
+    expect(JSON.stringify(thrown)).not.toContain("tool_calls");
+    expect(JSON.stringify(thrown)).not.toContain("request-id-123");
   });
 });

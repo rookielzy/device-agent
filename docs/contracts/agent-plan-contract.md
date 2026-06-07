@@ -102,6 +102,35 @@ Control requests are confirmable by default. A pending control contains:
 
 A pending control must not claim that simulated execution happened. The timeline should include `confirmation_required` and should not include `simulated_execution` until a later confirmation flow applies the change.
 
+## HTTP API
+
+The Fastify API exposes the contract through task-centered routes:
+
+- `POST /tasks` with `{ "text": "..." }` creates a task and returns `TaskResult`.
+- `GET /tasks/:taskId` inspects the stored `TaskResult`.
+- `POST /tasks/:taskId/confirm` confirms a pending control and returns the service-owned `TaskResult`.
+- `POST /tasks/:taskId/reject` rejects a pending control and returns the service-owned `TaskResult`.
+- `GET /debug/simulated-devices` returns `{ "devices": [...] }` using the same in-process simulated device service as task routes.
+
+Domain outcomes remain task-shaped over HTTP. Ambiguous requests, unsupported requests, offline devices, parse failures, rejected controls, duplicate confirmations, expired confirmations, and missing pending controls are represented as `TaskResult` values when `TaskService` owns that lifecycle result.
+
+Transport failures use a separate `ApiError` envelope:
+
+```json
+{
+  "error": {
+    "code": "validation_error",
+    "message": "Request failed validation",
+    "statusCode": 400,
+    "details": ["text: Too small: expected string to have >=1 characters"]
+  }
+}
+```
+
+`ApiError.code` is one of `validation_error`, `not_found`, or `internal_error`. Examples include malformed task creation bodies, unknown task inspection, unknown routes, method mismatches, and unexpected route errors. Public HTTP responses must not expose LangChain messages, tool calls, DeepSeek raw payloads, run ids, or provider metadata.
+
+The debug snapshot is a developer V1 support surface. It is read-only, in-memory, and does not define a real IoT adapter contract. Confirmed controls are visible there because the task service and debug route share the same simulated device service instance.
+
 ## Simulated Device Context
 
 Simulated devices are represented through capabilities:
