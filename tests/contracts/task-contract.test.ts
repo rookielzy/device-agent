@@ -9,12 +9,16 @@ import { taskResultSchema } from "../../src/contracts/task-contract.js";
 import {
   ambiguousTaskResult,
   bedroomSensor,
+  expiredConfirmationTaskResult,
   hallwayLight,
+  invalidValueTaskResult,
   langChainSpecificPayload,
   livingRoomAirConditioner,
   offlineKitchenLight,
   pendingControlTaskResult,
+  rejectedTaskResult,
   statusQueryTaskResult,
+  unsupportedTaskResult,
   unavailableTaskResult
 } from "../fixtures/contract-fixtures.js";
 
@@ -70,6 +74,7 @@ describe("task result contract", () => {
 
     expect(parsed.classification).toBe("status_query");
     expect(parsed.executionState).toBe("completed");
+    expect(parsed.outcomeReason).toBe("none");
     expect(parsed.selectedContext.dataItems).toHaveLength(4);
     expect(parsed.timeline.map((event) => event.stage)).toContain("simulated_read");
   });
@@ -87,10 +92,19 @@ describe("task result contract", () => {
     const unavailable = taskResultSchema.parse(unavailableTaskResult);
 
     expect(ambiguous.executionState).toBe("needs_clarification");
+    expect(ambiguous.outcomeReason).toBe("ambiguous_target");
     expect(ambiguous.selectedControlItems).toHaveLength(0);
     expect(ambiguous.selectedContext.candidates.length).toBeGreaterThan(0);
     expect(unavailable.executionState).toBe("unavailable");
+    expect(unavailable.outcomeReason).toBe("device_offline");
     expect(unavailable.pendingControl).toBeUndefined();
+  });
+
+  it("parses blocked outcomes with machine-readable reasons", () => {
+    expect(taskResultSchema.parse(unsupportedTaskResult).outcomeReason).toBe("read_only_control");
+    expect(taskResultSchema.parse(invalidValueTaskResult).outcomeReason).toBe("invalid_control_value");
+    expect(taskResultSchema.parse(rejectedTaskResult).outcomeReason).toBe("control_rejected");
+    expect(taskResultSchema.parse(expiredConfirmationTaskResult).outcomeReason).toBe("pending_control_expired");
   });
 
   it("rejects malformed task results missing classification or timeline", () => {

@@ -243,6 +243,7 @@ export const statusQueryTaskResult: TaskResult = {
   originalText: "Is the living room air conditioner running?",
   classification: "status_query",
   executionState: "completed",
+  outcomeReason: "none",
   reply: "The living room air conditioner is on, cooling to 24 celsius. The room is currently 25.3 celsius.",
   userReply: "The living room air conditioner is on, cooling to 24 celsius. The room is currently 25.3 celsius.",
   plan: {
@@ -332,6 +333,7 @@ export const pendingControlTaskResult: TaskResult = {
   originalText: "Turn on the hallway light",
   classification: "control_request",
   executionState: "pending_confirmation",
+  outcomeReason: "none",
   reply: "Please confirm: turn on the hallway light.",
   plan: {
     summary: "Prepare a confirmable control request for the hallway light.",
@@ -421,6 +423,7 @@ export const ambiguousTaskResult: TaskResult = {
   originalText: "What is the bedroom device doing?",
   classification: "ambiguous",
   executionState: "needs_clarification",
+  outcomeReason: "ambiguous_target",
   reply: "I found multiple bedroom devices. Which one should I use?",
   plan: {
     summary: "Ask for clarification because multiple simulated devices match the request.",
@@ -473,6 +476,7 @@ export const unavailableTaskResult: TaskResult = {
   originalText: "Turn on the kitchen light",
   classification: "control_request",
   executionState: "unavailable",
+  outcomeReason: "device_offline",
   reply: "I cannot control the kitchen light because it is offline.",
   plan: {
     summary: "Report unavailable simulated device state instead of creating a pending control.",
@@ -525,3 +529,105 @@ export const langChainSpecificPayload = {
   tool_calls: [{ id: "call-001", name: "read_device" }],
   run: { id: "run-001" }
 };
+
+export const unsupportedTaskResult: TaskResult = {
+  ...unavailableTaskResult,
+  taskId: "task-unsupported-001",
+  originalText: "Set the bedroom sensor temperature to 19",
+  executionState: "unavailable",
+  outcomeReason: "read_only_control",
+  reply: "The bedroom environmental sensor does not support that control.",
+  selectedContext: {
+    devices: [bedroomSensor],
+    dataItems: [],
+    controlItems: [],
+    candidates: []
+  },
+  timeline: unavailableTaskResult.timeline.map((event, index) => ({
+    ...event,
+    eventId: `evt-unsupported-${index + 1}`,
+    detail: index === unavailableTaskResult.timeline.length - 1 ? "Returned unsupported control outcome" : event.detail
+  }))
+};
+
+export const invalidValueTaskResult: TaskResult = withoutPendingControl({
+  taskId: "task-invalid-value-001",
+  executionState: "failed",
+  outcomeReason: "invalid_control_value",
+  reply: "Value yes is invalid for Power.",
+  selectedControlItems: [],
+  selectedContext: {
+    devices: [hallwayLight],
+    dataItems: [],
+    controlItems: [],
+    candidates: []
+  },
+  timeline: pendingControlTaskResult.timeline.map((event, index) => ({
+    ...event,
+    eventId: `evt-invalid-${index + 1}`,
+    stage: index === 3 ? "service_validation" : event.stage,
+    status: index >= 3 ? "blocked" : event.status,
+    detail: index === 3 ? "Requested control value is invalid" : event.detail
+  }))
+});
+
+export const rejectedTaskResult: TaskResult = withoutPendingControl({
+  taskId: "task-rejected-001",
+  executionState: "rejected",
+  outcomeReason: "control_rejected",
+  reply: "Okay, I will not change the hallway light.",
+  timeline: [
+    ...pendingControlTaskResult.timeline,
+    {
+      eventId: "evt-rejected-001",
+      stage: "confirmation_received",
+      source: "client",
+      status: "blocked",
+      at: "2026-06-07T08:32:00.000Z",
+      detail: "User rejected pending control"
+    },
+    {
+      eventId: "evt-rejected-002",
+      stage: "final_outcome",
+      source: "service",
+      status: "blocked",
+      at: "2026-06-07T08:32:01.000Z",
+      detail: "Returned rejected outcome without mutation"
+    }
+  ]
+});
+
+export const expiredConfirmationTaskResult: TaskResult = withoutPendingControl({
+  taskId: "task-expired-001",
+  executionState: "failed",
+  outcomeReason: "pending_control_expired",
+  reply: "That confirmation has expired. Please start again.",
+  timeline: [
+    ...pendingControlTaskResult.timeline,
+    {
+      eventId: "evt-expired-001",
+      stage: "confirmation_received",
+      source: "client",
+      status: "blocked",
+      at: "2026-06-07T08:52:00.000Z",
+      detail: "Confirmation arrived after pending control expiry"
+    },
+    {
+      eventId: "evt-expired-002",
+      stage: "final_outcome",
+      source: "service",
+      status: "blocked",
+      at: "2026-06-07T08:52:01.000Z",
+      detail: "Returned expired confirmation outcome without mutation"
+    }
+  ]
+});
+
+function withoutPendingControl(overrides: Partial<TaskResult>): TaskResult {
+  const { pendingControl: _pendingControl, ...base } = pendingControlTaskResult;
+
+  return {
+    ...base,
+    ...overrides
+  };
+}

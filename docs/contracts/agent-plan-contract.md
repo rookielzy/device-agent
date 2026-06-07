@@ -12,6 +12,7 @@ A task result contains:
 - `originalText`: the user text that started the task.
 - `classification`: one of `status_query`, `control_request`, `ambiguous`, or `unsupported`.
 - `executionState`: one of `completed`, `pending_confirmation`, `needs_clarification`, `unavailable`, `rejected`, or `failed`.
+- `outcomeReason`: machine-readable reason for the outcome. Successful and ordinary pending tasks use `none`; blocked outcomes use values such as `ambiguous_target`, `device_offline`, `unsupported_data_item`, `invalid_control_value`, `pending_control_expired`, or `control_rejected`.
 - `reply`: user-facing response text.
 - `plan`: structured understanding with a summary, confidence score, plan steps, and optional ambiguity reason.
 - `selectedContext`: simulated devices, selected readable data items, selected writable controls, and ambiguity candidates.
@@ -26,6 +27,7 @@ Example status-query payload:
   "originalText": "Is the living room air conditioner running?",
   "classification": "status_query",
   "executionState": "completed",
+  "outcomeReason": "none",
   "reply": "The living room air conditioner is on, cooling to 24 celsius. The room is currently 25.3 celsius.",
   "plan": {
     "summary": "Answer the living room air conditioner status from simulated readable values.",
@@ -74,6 +76,8 @@ Test fixtures in `tests/fixtures/contract-fixtures.ts` carry complete examples w
 `rejected` means a pending control request was rejected or cancelled.
 
 `failed` is reserved for unexpected service failures that still return a contract-shaped task result.
+
+Clients should use `outcomeReason` for branching and analytics instead of parsing `reply` or timeline detail text. `executionState` describes the lifecycle bucket; `outcomeReason` explains why that bucket was reached.
 
 ## Timeline Vocabulary
 
