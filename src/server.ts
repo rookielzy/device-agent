@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FastifyInstance } from "fastify";
 import { buildApp, createAppDependencies, type AppDependencies } from "./app.js";
@@ -74,6 +75,10 @@ if (isDirectExecution()) {
   void main();
 }
 
+export function isDirectExecutionPath(argvPath: string | undefined, moduleUrl: string): boolean {
+  return argvPath !== undefined && resolve(argvPath) === fileURLToPath(moduleUrl);
+}
+
 function isDirectExecution(): boolean {
-  return process.argv[1] === fileURLToPath(import.meta.url);
+  return isDirectExecutionPath(process.argv[1], import.meta.url);
 }

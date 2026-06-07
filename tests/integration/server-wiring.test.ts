@@ -4,7 +4,7 @@ import type { CreateAgentInterpreterOptions } from "../../src/agent/agent-factor
 import type { AgentInterpreter } from "../../src/agent/agent-interpreter.js";
 import { buildApp } from "../../src/app.js";
 import { parseEnv } from "../../src/config/env.js";
-import { createRuntimeDependencies, shouldExposeDebugRoutes, startServer } from "../../src/server.js";
+import { createRuntimeDependencies, isDirectExecutionPath, shouldExposeDebugRoutes, startServer } from "../../src/server.js";
 import { createFixedInterpreter, livingRoomStatusProposal } from "../fixtures/task-fixtures.js";
 
 describe("server runtime wiring", () => {
@@ -15,6 +15,15 @@ describe("server runtime wiring", () => {
 
     expect(packageJson.scripts.start).toBe("node dist/src/server.js");
     expect(packageJson.scripts.dev).toContain("node dist/src/server.js");
+  });
+
+  it("detects direct execution for relative emitted server paths", () => {
+    const cwd = process.cwd();
+    const moduleUrl = new URL(`file://${cwd}/dist/src/server.js`).href;
+
+    expect(isDirectExecutionPath("dist/src/server.js", moduleUrl)).toBe(true);
+    expect(isDirectExecutionPath(`${cwd}/dist/src/server.js`, moduleUrl)).toBe(true);
+    expect(isDirectExecutionPath("dist/src/app.js", moduleUrl)).toBe(false);
   });
 
   it("imports app construction without listening or requiring DeepSeek credentials", async () => {
