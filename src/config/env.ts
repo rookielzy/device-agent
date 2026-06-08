@@ -1,6 +1,30 @@
 import { z } from "zod";
 
 const interpreterModeSchema = z.enum(["fake", "deepseek"]);
+const booleanEnvSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .optional()
+  .transform((value, ctx) => {
+    if (value === undefined || value === "") {
+      return false;
+    }
+
+    if (["1", "true", "yes"].includes(value)) {
+      return true;
+    }
+
+    if (["0", "false", "no"].includes(value)) {
+      return false;
+    }
+
+    ctx.addIssue({
+      code: "custom",
+      message: "boolean environment values must be one of true, false, 1, 0, yes, or no"
+    });
+    return z.NEVER;
+  });
 
 const rawEnvSchema = z.object({
   HOST: z.string().trim().min(1).default("127.0.0.1"),
@@ -23,7 +47,8 @@ const rawEnvSchema = z.object({
     }),
   AGENT_INTERPRETER_MODE: interpreterModeSchema.default("fake"),
   DEEPSEEK_API_KEY: z.string().trim().optional(),
-  DEEPSEEK_MODEL: z.string().trim().min(1).default("deepseek-v4-flash")
+  DEEPSEEK_MODEL: z.string().trim().min(1).default("deepseek-v4-flash"),
+  ENABLE_DEBUG_SIMULATED_DEVICES: booleanEnvSchema
 });
 
 export type InterpreterMode = z.infer<typeof interpreterModeSchema>;
@@ -36,6 +61,7 @@ export type AppConfig = {
     apiKey?: string;
     model: string;
   };
+  enableDebugSimulatedDevices: boolean;
 };
 
 export class ConfigError extends Error {
@@ -67,6 +93,7 @@ export function parseEnv(input: NodeJS.ProcessEnv = process.env): AppConfig {
     deepseek: {
       ...(apiKey ? { apiKey } : {}),
       model: parsed.data.DEEPSEEK_MODEL
-    }
+    },
+    enableDebugSimulatedDevices: parsed.data.ENABLE_DEBUG_SIMULATED_DEVICES
   };
 }
