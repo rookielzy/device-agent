@@ -38,7 +38,7 @@ A task result contains:
 - `originalText`: the user text that started the task.
 - `classification`: one of `status_query`, `control_request`, `ambiguous`, or `unsupported`.
 - `executionState`: one of `completed`, `pending_confirmation`, `needs_clarification`, `unavailable`, `rejected`, or `failed`.
-- `outcomeReason`: machine-readable reason for the outcome. Successful and ordinary pending tasks use `none`; blocked outcomes use values such as `ambiguous_target`, `device_offline`, `unsupported_data_item`, `invalid_control_value`, `pending_control_expired`, or `control_rejected`.
+- `outcomeReason`: machine-readable reason for the outcome. Successful and ordinary pending tasks use `none`; blocked outcomes use `ambiguous_target`, `device_not_found`, `device_offline`, `unsupported_request`, `unsupported_data_item`, `unsupported_control_item`, `read_only_control`, `invalid_control_value`, `parse_failure`, `pending_control_missing`, `pending_control_expired`, `pending_control_already_confirmed`, `pending_control_already_rejected`, `control_rejected`, `confirmation_failed`, or `service_error`.
 - `reply`: user-facing response text.
 - `plan`: structured understanding with a summary, confidence score, plan steps, and optional ambiguity reason.
 - `selectedContext`: simulated devices, selected readable data items, selected writable controls, and ambiguity candidates.
@@ -166,6 +166,8 @@ DEEPSEEK_MODEL=deepseek-v4-flash
 
 Configuration parsing rejects live DeepSeek mode when the API key is missing.
 
+Live smoke validation is manual and opt-in. `tests/agent/langchain-live-smoke.test.ts` runs only when both `DEEPSEEK_LIVE_SMOKE=1` and `DEEPSEEK_API_KEY` are present, then checks that one status query and one control request parse through the provider-neutral proposal schema. Network access, model availability, latency, and provider cost are outside the default regression suite.
+
 ## Interpreter Adapter Boundary
 
 `src/agent/agent-interpreter.ts` is the provider-neutral boundary consumed by `TaskService`. The deterministic fake interpreter and the LangChain DeepSeek adapter both return normalized `AgentProposal` values:
@@ -179,3 +181,10 @@ Configuration parsing rejects live DeepSeek mode when the API key is missing.
 ## V1 Boundaries
 
 V1 contracts describe simulated devices only. They do not promise real IoT adapter behavior, production persistence, voice input or output, automatic device control, frontend rendering, household permission checks, or real audit-retention policy.
+
+Known operational limits remain outside this slice:
+
+- Task and pending-control repositories are in-memory and do not enforce retention; unbounded in-memory task growth is deferred follow-up work.
+- Runtime request or handler timeout hardening is deferred follow-up work.
+- Authentication, authorization, CORS, rate limiting, production observability, and deployment runbooks are not part of V1.
+- The debug simulated-device endpoint is for local developer inspection only and is not a real adapter management surface.

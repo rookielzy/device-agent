@@ -9,6 +9,7 @@ import {
   hallwayLightOnProposal,
   livingRoomStatusProposal
 } from "../fixtures/task-fixtures.js";
+import { sampleTextFor } from "../fixtures/sample-utterances.js";
 
 describe("LangChainDeepSeekInterpreter contract", () => {
   it("returns normalized status proposals from mocked structured response", async () => {
@@ -19,7 +20,7 @@ describe("LangChainDeepSeekInterpreter contract", () => {
     });
 
     const proposal = await interpreter.interpret({
-      originalText: "Is the living room air conditioner running?"
+      originalText: sampleTextFor("ae1-living-room-ac-status")
     });
 
     expect(proposal).toEqual(livingRoomStatusProposal);
@@ -27,7 +28,7 @@ describe("LangChainDeepSeekInterpreter contract", () => {
     expect(calls[0]?.messages).toEqual([
       {
         role: "user",
-        content: expect.stringContaining("Is the living room air conditioner running?")
+        content: expect.stringContaining(sampleTextFor("ae1-living-room-ac-status"))
       }
     ]);
     expect(calls[0]?.messages[0]?.content).toContain("Interpret this user request");
@@ -41,7 +42,7 @@ describe("LangChainDeepSeekInterpreter contract", () => {
     });
 
     const proposal = await interpreter.interpret({
-      originalText: "Turn on the hallway light"
+      originalText: sampleTextFor("ae2-hallway-light-on")
     });
     const after = deviceService.readStatus({
       room: "hallway",
@@ -88,7 +89,7 @@ describe("LangChainDeepSeekInterpreter contract", () => {
     });
 
     const proposal = await interpreter.interpret({
-      originalText: "Turn on the hallway light"
+      originalText: sampleTextFor("ae2-hallway-light-on")
     });
 
     expect(proposal).toMatchObject({
@@ -104,7 +105,7 @@ describe("LangChainDeepSeekInterpreter contract", () => {
     });
 
     const proposal = await interpreter.interpret({
-      originalText: "Turn on the hallway light"
+      originalText: sampleTextFor("ae2-hallway-light-on")
     });
 
     expect(proposal).toMatchObject({
@@ -121,7 +122,7 @@ describe("LangChainDeepSeekInterpreter contract", () => {
     });
 
     const proposal = await interpreter.interpret({
-      originalText: "Turn on the hallway light"
+      originalText: sampleTextFor("ae2-hallway-light-on")
     });
 
     expect(proposal).toMatchObject({
@@ -153,7 +154,7 @@ describe("LangChainDeepSeekInterpreter contract", () => {
     });
 
     const proposal = await interpreter.interpret({
-      originalText: "Is the living room air conditioner running?"
+      originalText: sampleTextFor("ae1-living-room-ac-status")
     });
 
     expect(proposal.kind).toBe("status_query");

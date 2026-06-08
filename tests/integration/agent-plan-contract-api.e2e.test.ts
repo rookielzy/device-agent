@@ -7,13 +7,13 @@ import { taskResultSchema, type TaskResult } from "../../src/contracts/task-cont
 import { SimulatedDeviceService } from "../../src/domain/devices/simulated-device-service.js";
 import { TaskService } from "../../src/domain/tasks/task-service.js";
 import { createFixedClock, createIdSequence } from "../fixtures/task-fixtures.js";
-import { sampleUtterances } from "../fixtures/sample-utterances.js";
+import { sampleTextFor } from "../fixtures/sample-utterances.js";
 
 describe("Agent Plan Contract HTTP acceptance examples", () => {
   it("covers status, confirmed control, offline control, and ambiguity over HTTP", async () => {
     const app = createAcceptanceApp();
     try {
-      const status = await createTask(app, textFor("ae1-living-room-ac-status"));
+      const status = await createTask(app, sampleTextFor("ae1-living-room-ac-status"));
       expect(status.executionState).toBe("completed");
       expect(status.selectedDataItems.map((item) => item.itemId)).toEqual([
         "power",
@@ -23,7 +23,7 @@ describe("Agent Plan Contract HTTP acceptance examples", () => {
       ]);
       expect(status.timeline.some((event) => event.source === "simulated_device")).toBe(true);
 
-      const confirmedPending = await createTask(app, textFor("ae2-hallway-light-on"));
+      const confirmedPending = await createTask(app, sampleTextFor("ae2-hallway-light-on"));
       const beforeConfirm = await debugDevices(app);
       const confirmed = taskResultSchema.parse((await app.inject({
         method: "POST",
@@ -35,13 +35,13 @@ describe("Agent Plan Contract HTTP acceptance examples", () => {
       expect(hallwayPower(beforeConfirm)).toBe(false);
       expect(hallwayPower(afterConfirm)).toBe(true);
 
-      const offline = await createTask(app, textFor("ae4-offline-kitchen-light"));
+      const offline = await createTask(app, sampleTextFor("ae4-offline-kitchen-light"));
       expect(offline.executionState).toBe("unavailable");
       expect(offline.outcomeReason).toBe("device_offline");
       expect(offline.pendingControl).toBeUndefined();
       expect(offline.timeline.map((event) => event.stage)).not.toContain("simulated_execution");
 
-      const ambiguous = await createTask(app, textFor("ae5-vague-bedroom-device"));
+      const ambiguous = await createTask(app, sampleTextFor("ae5-vague-bedroom-device"));
       expect(ambiguous.executionState).toBe("needs_clarification");
       expect(ambiguous.outcomeReason).toBe("ambiguous_target");
       expect(ambiguous.selectedContext.candidates.length).toBeGreaterThan(1);
@@ -58,7 +58,7 @@ describe("Agent Plan Contract HTTP acceptance examples", () => {
 
     try {
       const beforePending = await debugDevices(app);
-      const unconfirmedPending = await createTask(app, textFor("ae3-unconfirmed-hallway-light"));
+      const unconfirmedPending = await createTask(app, sampleTextFor("ae3-unconfirmed-hallway-light"));
       const afterPending = await debugDevices(app);
       const rejected = taskResultSchema.parse((await app.inject({
         method: "POST",
@@ -120,14 +120,4 @@ async function debugDevices(app: FastifyInstance) {
 
 function hallwayPower(devices: Array<{ deviceId: string; readableValues: Array<{ itemId: string; value?: unknown }> }>): boolean | undefined {
   return devices.find((device) => device.deviceId === "device-light-hallway")?.readableValues.find((item) => item.itemId === "power")?.value as boolean | undefined;
-}
-
-function textFor(id: string): string {
-  const utterance = sampleUtterances.find((candidate) => candidate.id === id);
-
-  if (!utterance) {
-    throw new Error(`Missing sample utterance ${id}`);
-  }
-
-  return utterance.text;
 }

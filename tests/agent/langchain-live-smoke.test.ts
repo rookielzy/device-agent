@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { LangChainDeepSeekInterpreter } from "../../src/agent/langchain-deepseek-interpreter.js";
 import { agentProposalSchema } from "../../src/agent/agent-schemas.js";
 import { shouldRunDeepSeekLiveSmoke } from "../../src/agent/live-smoke.js";
+import { sampleTextFor } from "../fixtures/sample-utterances.js";
 
 const shouldRunLiveSmoke = shouldRunDeepSeekLiveSmoke();
 const describeLive = shouldRunLiveSmoke ? describe : describe.skip;
@@ -23,10 +24,10 @@ describeLive("LangChain DeepSeek live smoke", () => {
     });
 
     const status = await interpreter.interpret({
-      originalText: "Is the living room air conditioner running?"
+      originalText: sampleTextFor("ae1-living-room-ac-status")
     });
     const control = await interpreter.interpret({
-      originalText: "Turn on the hallway light"
+      originalText: sampleTextFor("ae2-hallway-light-on")
     });
 
     expect(agentProposalSchema.safeParse(status).success).toBe(true);
