@@ -2,12 +2,22 @@ import { describe, expect, it } from "vitest";
 import { apiErrorSchema } from "../../src/contracts/api-contract.js";
 import { taskResultSchema, type TaskResult } from "../../src/contracts/task-contract.js";
 import {
+  hallwayLightOnProposal,
+  invalidHallwayControlProposal,
   livingRoomStatusProposal,
   parseFailureProposal,
   readOnlySensorControlProposal,
   vagueBedroomStatusProposal
 } from "../fixtures/task-fixtures.js";
 import { createTestApi } from "./api-test-helpers.js";
+
+const forbiddenProviderFields = [
+  "tool_calls",
+  "run_id",
+  "provider_metadata",
+  "raw provider",
+  "DeepSeek"
+];
 
 describe("Task HTTP API", () => {
   it("creates and inspects a completed air-conditioner status task", async () => {
@@ -83,36 +93,64 @@ describe("Task HTTP API", () => {
       expect(parseFailureResponse.statusCode).toBe(201);
       expect(parseFailure.executionState).toBe("failed");
       expect(parseFailure.outcomeReason).toBe("parse_failure");
-      expect(JSON.stringify(parseFailure)).not.toContain("tool_calls");
-      expect(JSON.stringify(parseFailure)).not.toContain("DeepSeek");
+      expectProviderNeutral(parseFailure);
     } finally {
       await api.app.close();
     }
   });
 
-  it("returns schema-valid unsupported control outcomes without provider fields", async () => {
-    const api = createTestApi([readOnlySensorControlProposal]);
+  it("returns schema-valid pending and unsupported control outcomes without provider fields", async () => {
+    const api = createTestApi([
+      hallwayLightOnProposal,
+      readOnlySensorControlProposal,
+      invalidHallwayControlProposal
+    ]);
 
     try {
+      const pendingResponse = await api.app.inject({
+        method: "POST",
+        url: "/tasks",
+        payload: { text: "Turn on the hallway light" }
+      });
       const response = await api.app.inject({
         method: "POST",
         url: "/tasks",
         payload: { text: "Set the bedroom sensor temperature to 19" }
       });
+      const invalidResponse = await api.app.inject({
+        method: "POST",
+        url: "/tasks",
+        payload: { text: "Turn on the hallway light" }
+      });
+      const pending = taskResultSchema.parse(pendingResponse.json<TaskResult>());
       const result = taskResultSchema.parse(response.json<TaskResult>());
+      const invalid = taskResultSchema.parse(invalidResponse.json<TaskResult>());
       const inspected = await api.app.inject({
         method: "GET",
         url: `/tasks/${result.taskId}`
       });
+
+      expect(pendingResponse.statusCode).toBe(201);
+      expect(pending.executionState).toBe("pending_confirmation");
+      expect(pending.pendingControl?.target.controlId).toBe("power");
+      expect(pending.timeline.map((event) => event.stage)).toContain("confirmation_required");
+      expect(pending.timeline.map((event) => event.stage)).not.toContain("simulated_execution");
+      expectProviderNeutral(pending);
 
       expect(response.statusCode).toBe(201);
       expect(result.executionState).toBe("unavailable");
       expect(result.outcomeReason).toBe("read_only_control");
       expect(result.pendingControl).toBeUndefined();
       expect(result.timeline.map((event) => event.stage)).not.toContain("simulated_execution");
-      expect(JSON.stringify(result)).not.toContain("tool_calls");
-      expect(JSON.stringify(result)).not.toContain("DeepSeek");
+      expectProviderNeutral(result);
       expect(taskResultSchema.parse(inspected.json())).toEqual(result);
+
+      expect(invalidResponse.statusCode).toBe(201);
+      expect(invalid.executionState).toBe("failed");
+      expect(invalid.outcomeReason).toBe("invalid_control_value");
+      expect(invalid.pendingControl).toBeUndefined();
+      expect(invalid.timeline.map((event) => event.stage)).not.toContain("simulated_execution");
+      expectProviderNeutral(invalid);
     } finally {
       await api.app.close();
     }
@@ -173,4 +211,54 @@ describe("Task HTTP API", () => {
       await api.app.close();
     }
   });
+
+  it("returns ApiError for unknown routes and task route method mismatches", async () => {
+    const api = createTestApi([]);
+
+    try {
+      const unknownRoute = await api.app.inject({
+        method: "GET",
+        url: "/not-a-route"
+      });
+      const methodMismatch = await api.app.inject({
+        method: "DELETE",
+        url: "/tasks/task-001"
+      });
+
+      expect(unknownRoute.statusCode).toBe(404);
+      expect(apiErrorSchema.parse(unknownRoute.json()).error).toMatchObject({
+        code: "not_found",
+        statusCode: 404,
+        details: {
+          request: {
+            method: "GET",
+            route: "unmatched"
+          }
+        }
+      });
+      expect(methodMismatch.statusCode).toBe(405);
+      expect(methodMismatch.headers.allow).toBe("GET");
+      expect(apiErrorSchema.parse(methodMismatch.json()).error).toMatchObject({
+        code: "method_not_allowed",
+        statusCode: 405,
+        details: {
+          request: {
+            method: "DELETE",
+            route: "/tasks/:taskId"
+          }
+        }
+      });
+      expect(api.taskService.taskRepository.list()).toEqual([]);
+    } finally {
+      await api.app.close();
+    }
+  });
 });
+
+function expectProviderNeutral(value: unknown): void {
+  const serialized = JSON.stringify(value);
+
+  for (const field of forbiddenProviderFields) {
+    expect(serialized).not.toContain(field);
+  }
+}

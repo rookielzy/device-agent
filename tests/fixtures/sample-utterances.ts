@@ -83,3 +83,13 @@ export const sampleUtterances = [
 ] satisfies SampleUtterance[];
 
 export const sampleUtteranceTexts = sampleUtterances.map((utterance) => utterance.text);
+
+export function sampleTextFor(id: string): string {
+  const utterance = sampleUtterances.find((candidate) => candidate.id === id);
+
+  if (!utterance) {
+    throw new Error(`Missing sample utterance ${id}`);
+  }
+
+  return utterance.text;
+}
