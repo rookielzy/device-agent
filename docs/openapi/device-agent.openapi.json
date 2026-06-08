@@ -1,0 +1,1095 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Device Agent API",
+    "version": "0.1.0",
+    "description": "Text-first simulated IoT Agent Plan Contract API. Local fake mode does not require DeepSeek credentials."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:3000",
+      "description": "Local fake-mode server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Tasks",
+      "description": "Submit natural-language tasks, inspect task records, and confirm or reject pending controls."
+    },
+    {
+      "name": "Debug",
+      "description": "Read-only simulated-device debug surface for local developer validation."
+    }
+  ],
+  "paths": {
+    "/tasks": {
+      "post": {
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Create a text task",
+        "description": "Creates a task from natural-language text. Domain outcomes such as ambiguity, unsupported requests, offline devices, parse failures, and pending confirmation are returned as TaskResult responses.",
+        "operationId": "createTask",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskBody"
+              },
+              "examples": {
+                "statusQuery": {
+                  "summary": "Air-conditioner status",
+                  "value": {
+                    "text": "Is the living room air conditioner running?"
+                  }
+                },
+                "controlRequest": {
+                  "summary": "Pending hallway-light control",
+                  "value": {
+                    "text": "Turn on the hallway light"
+                  }
+                },
+                "offlineControl": {
+                  "summary": "Offline kitchen-light control",
+                  "value": {
+                    "text": "Turn on the kitchen light"
+                  }
+                },
+                "ambiguousQuery": {
+                  "summary": "Ambiguous bedroom device",
+                  "value": {
+                    "text": "What is the bedroom device doing?"
+                  }
+                },
+                "parseFailure": {
+                  "summary": "Unsupported nonsensical input",
+                  "value": {
+                    "text": "Blue banana entropy please"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created task result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServiceError"
+          }
+        }
+      }
+    },
+    "/tasks/{taskId}": {
+      "get": {
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Get a stored task",
+        "description": "Returns the persisted TaskResult for an existing task id.",
+        "operationId": "getTask",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TaskId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stored task result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServiceError"
+          }
+        }
+      }
+    },
+    "/tasks/{taskId}/confirm": {
+      "post": {
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Confirm a pending control",
+        "description": "Confirms the stored pending control for the task id. This route does not accept a request body and does not reinterpret natural-language text. Missing, expired, duplicate, or already rejected pending controls are returned as task-shaped failed or rejected TaskResult responses when represented by the domain service.",
+        "operationId": "confirmTask",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TaskId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task result after confirmation attempt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServiceError"
+          }
+        }
+      }
+    },
+    "/tasks/{taskId}/reject": {
+      "post": {
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Reject a pending control",
+        "description": "Rejects the stored pending control for the task id. This route does not accept a request body and never mutates simulated device state.",
+        "operationId": "rejectTask",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TaskId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task result after rejection attempt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServiceError"
+          }
+        }
+      }
+    },
+    "/debug/simulated-devices": {
+      "get": {
+        "tags": [
+          "Debug"
+        ],
+        "summary": "List simulated devices",
+        "description": "Returns a read-only snapshot of the simulated devices used by the same task service instance. This V1 debug route is exposed automatically for localhost runtime hosts.",
+        "operationId": "getSimulatedDevices",
+        "responses": {
+          "200": {
+            "description": "Read-only simulated-device snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulatedDevicesSnapshot"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServiceError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "TaskId": {
+        "name": "taskId",
+        "in": "path",
+        "required": true,
+        "description": "Stable task identifier returned by POST /tasks.",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "example": "task-001"
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Malformed HTTP request or unsupported body.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Route or task not found.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "MethodNotAllowed": {
+        "description": "HTTP method is not supported for the route.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "ServiceError": {
+        "description": "Internal service error or response contract validation failure.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "CreateTaskBody": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "Natural-language task text."
+          }
+        }
+      },
+      "ApiError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ApiErrorBody"
+          }
+        }
+      },
+      "ApiErrorBody": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "message",
+          "statusCode"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ApiErrorCode"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "statusCode": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "details": {
+            "$ref": "#/components/schemas/ApiErrorDetails"
+          }
+        }
+      },
+      "ApiErrorCode": {
+        "type": "string",
+        "enum": [
+          "bad_request",
+          "not_found",
+          "method_not_allowed",
+          "response_validation_failed",
+          "service_error"
+        ]
+      },
+      "ApiErrorDetails": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "issues": {
+            "description": "Request or framework validation issues.",
+            "nullable": true
+          },
+          "request": {
+            "$ref": "#/components/schemas/ApiErrorRequestDetails"
+          },
+          "resource": {
+            "$ref": "#/components/schemas/ApiErrorResourceDetails"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "ApiErrorRequestDetails": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "method": {
+            "type": "string",
+            "minLength": 1
+          },
+          "route": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "ApiErrorResourceDetails": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "TaskResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "taskId",
+          "originalText",
+          "classification",
+          "executionState",
+          "outcomeReason",
+          "reply",
+          "plan",
+          "selectedContext",
+          "selectedDataItems",
+          "selectedControlItems",
+          "timeline"
+        ],
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "originalText": {
+            "type": "string",
+            "minLength": 1
+          },
+          "classification": {
+            "$ref": "#/components/schemas/TaskClassification"
+          },
+          "executionState": {
+            "$ref": "#/components/schemas/ExecutionState"
+          },
+          "outcomeReason": {
+            "$ref": "#/components/schemas/TaskOutcomeReason"
+          },
+          "reply": {
+            "type": "string",
+            "minLength": 1
+          },
+          "userReply": {
+            "type": "string",
+            "minLength": 1
+          },
+          "plan": {
+            "$ref": "#/components/schemas/StructuredPlan"
+          },
+          "selectedContext": {
+            "$ref": "#/components/schemas/SelectedDeviceContext"
+          },
+          "selectedDataItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SelectedDataItem"
+            }
+          },
+          "selectedControlItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SelectedControlItem"
+            }
+          },
+          "pendingControl": {
+            "$ref": "#/components/schemas/PendingControl"
+          },
+          "timeline": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/TimelineEvent"
+            }
+          }
+        }
+      },
+      "TaskClassification": {
+        "type": "string",
+        "enum": [
+          "status_query",
+          "control_request",
+          "ambiguous",
+          "unsupported"
+        ]
+      },
+      "ExecutionState": {
+        "type": "string",
+        "enum": [
+          "completed",
+          "pending_confirmation",
+          "needs_clarification",
+          "unavailable",
+          "rejected",
+          "failed"
+        ]
+      },
+      "TaskOutcomeReason": {
+        "type": "string",
+        "enum": [
+          "none",
+          "ambiguous_target",
+          "device_not_found",
+          "device_offline",
+          "unsupported_request",
+          "unsupported_data_item",
+          "unsupported_control_item",
+          "read_only_control",
+          "invalid_control_value",
+          "parse_failure",
+          "pending_control_missing",
+          "pending_control_expired",
+          "pending_control_already_confirmed",
+          "pending_control_already_rejected",
+          "control_rejected",
+          "confirmation_failed",
+          "service_error"
+        ]
+      },
+      "StructuredPlan": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "summary",
+          "steps",
+          "confidence"
+        ],
+        "properties": {
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/PlanStep"
+            }
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "ambiguityReason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "PlanStep": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "stepId",
+          "description",
+          "status"
+        ],
+        "properties": {
+          "stepId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "planned",
+              "completed",
+              "skipped",
+              "blocked"
+            ]
+          }
+        }
+      },
+      "PendingControl": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pendingControlId",
+          "target",
+          "confirmationSummary",
+          "expectedEffect"
+        ],
+        "properties": {
+          "pendingControlId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target": {
+            "$ref": "#/components/schemas/SelectedControlItem"
+          },
+          "confirmationSummary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expectedEffect": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TimelineEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "eventId",
+          "stage",
+          "source",
+          "status",
+          "at",
+          "detail"
+        ],
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "stage": {
+            "$ref": "#/components/schemas/TimelineStage"
+          },
+          "source": {
+            "$ref": "#/components/schemas/TimelineSource"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TimelineStatus"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "TimelineStage": {
+        "type": "string",
+        "enum": [
+          "request_received",
+          "model_interpretation",
+          "service_validation",
+          "device_resolution",
+          "simulated_read",
+          "confirmation_required",
+          "confirmation_received",
+          "simulated_execution",
+          "final_outcome"
+        ]
+      },
+      "TimelineSource": {
+        "type": "string",
+        "enum": [
+          "client",
+          "model",
+          "service",
+          "simulated_device"
+        ]
+      },
+      "TimelineStatus": {
+        "type": "string",
+        "enum": [
+          "started",
+          "succeeded",
+          "waiting",
+          "blocked",
+          "failed"
+        ]
+      },
+      "SelectedDeviceContext": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "devices",
+          "dataItems",
+          "controlItems",
+          "candidates"
+        ],
+        "properties": {
+          "devices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimulatedDeviceContext"
+            }
+          },
+          "dataItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SelectedDataItem"
+            }
+          },
+          "controlItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SelectedControlItem"
+            }
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimulatedDeviceContext"
+            }
+          }
+        }
+      },
+      "SelectedDataItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "deviceId",
+          "itemId",
+          "name"
+        ],
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "itemId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "$ref": "#/components/schemas/PublicValue"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ValueMetadata"
+          },
+          "freshness": {
+            "$ref": "#/components/schemas/ValueFreshness"
+          }
+        }
+      },
+      "SelectedControlItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "deviceId",
+          "controlId",
+          "name",
+          "requestedValue"
+        ],
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "controlId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "requestedValue": {
+            "$ref": "#/components/schemas/PublicValue"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ValueMetadata"
+          }
+        }
+      },
+      "SimulatedDevicesSnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "devices"
+        ],
+        "properties": {
+          "devices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SimulatedDeviceContext"
+            }
+          }
+        }
+      },
+      "SimulatedDeviceContext": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "deviceId",
+          "displayName",
+          "room",
+          "type",
+          "availability",
+          "capabilities",
+          "readableValues",
+          "writableControls"
+        ],
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "room": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "$ref": "#/components/schemas/DeviceType"
+          },
+          "availability": {
+            "$ref": "#/components/schemas/DeviceAvailability"
+          },
+          "capabilities": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "readableValues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReadableValue"
+            }
+          },
+          "writableControls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WritableControl"
+            }
+          }
+        }
+      },
+      "DeviceType": {
+        "type": "string",
+        "enum": [
+          "light",
+          "air_conditioner",
+          "environment_sensor",
+          "generic"
+        ]
+      },
+      "DeviceAvailability": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "online"
+        ],
+        "properties": {
+          "online": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "ReadableValue": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "itemId",
+          "name",
+          "metadata",
+          "freshness"
+        ],
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ValueMetadata"
+          },
+          "value": {
+            "$ref": "#/components/schemas/PublicValue"
+          },
+          "freshness": {
+            "$ref": "#/components/schemas/ValueFreshness"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WritableControl": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "controlId",
+          "name",
+          "metadata",
+          "writable"
+        ],
+        "properties": {
+          "controlId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ValueMetadata"
+          },
+          "currentValue": {
+            "$ref": "#/components/schemas/PublicValue"
+          },
+          "writable": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        }
+      },
+      "ValueFreshness": {
+        "type": "string",
+        "enum": [
+          "fresh",
+          "stale",
+          "unknown"
+        ]
+      },
+      "PublicValue": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      },
+      "ValueMetadata": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/BooleanValueMetadata"
+          },
+          {
+            "$ref": "#/components/schemas/NumberValueMetadata"
+          },
+          {
+            "$ref": "#/components/schemas/StringValueMetadata"
+          },
+          {
+            "$ref": "#/components/schemas/EnumValueMetadata"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "boolean": "#/components/schemas/BooleanValueMetadata",
+            "number": "#/components/schemas/NumberValueMetadata",
+            "string": "#/components/schemas/StringValueMetadata",
+            "enum": "#/components/schemas/EnumValueMetadata"
+          }
+        }
+      },
+      "BooleanValueMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "kind"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "boolean"
+            ]
+          }
+        }
+      },
+      "NumberValueMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "kind"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "number"
+            ]
+          },
+          "min": {
+            "type": "number"
+          },
+          "max": {
+            "type": "number"
+          },
+          "step": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      },
+      "StringValueMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "kind"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "string"
+            ]
+          }
+        }
+      },
+      "EnumValueMetadata": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "kind",
+          "options"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "enum"
+            ]
+          },
+          "options": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

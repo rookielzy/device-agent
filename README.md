@@ -42,6 +42,14 @@ POST /tasks/:taskId/reject
 GET /debug/simulated-devices
 ```
 
+An Apifox-importable OpenAPI document is available at:
+
+```text
+docs/openapi/device-agent.openapi.json
+```
+
+Import it into Apifox as an OpenAPI file and use `http://127.0.0.1:3000` as the local server URL after starting `pnpm dev`.
+
 `POST /tasks` accepts a JSON body with non-empty text up to 4,000 characters. This status-query example is covered by `tests/fixtures/sample-utterances.ts`:
 
 ```bash
