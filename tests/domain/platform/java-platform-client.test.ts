@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildPlatformHeaders, JavaPlatformClient } from "../../../src/domain/platform/java-platform-client.js";
 import { PlatformClientError, type PlatformClientConfig, type PlatformFetch } from "../../../src/domain/platform/platform-types.js";
+import { createTracer, type TraceEvent } from "../../../src/observability/trace.js";
 import {
   financeRoomAirConditioner,
   financeRoomAirConditionerDetail,
@@ -20,6 +21,48 @@ const config: PlatformClientConfig = {
 };
 
 describe("JavaPlatformClient", () => {
+  it("traces platform HTTP request and response payloads with sensitive fields redacted", async () => {
+    const events: TraceEvent[] = [];
+    const tracer = createTracer({
+      enabled: true,
+      includePayloads: true,
+      sink: (event) => events.push(event),
+      traceIdGenerator: () => "trace-platform-001"
+    });
+    const client = new JavaPlatformClient({
+      config,
+      fetch: createFetch([], [ok(platformLoginResponse)]),
+      clock: () => 1_000,
+      tracer
+    });
+
+    await client.login();
+
+    expect(events.find((event) => event.event === "request.input")?.fields).toMatchObject({
+      operation: "login",
+      request: {
+        url: "https://user.example.test/oauth/login",
+        method: "POST",
+        body: {
+          mobile: "13800000000",
+          password: "[redacted]"
+        }
+      }
+    });
+    expect(events.find((event) => event.event === "response.output")?.fields).toMatchObject({
+      operation: "login",
+      response: {
+        ok: true,
+        status: 200,
+        body: {
+          access_token: "[redacted]",
+          refresh_token: "[redacted]",
+          token_type: "[redacted]"
+        }
+      }
+    });
+  });
+
   it("logs in with validation credentials and stores the token response", async () => {
     const calls: FetchCall[] = [];
     const client = new JavaPlatformClient({

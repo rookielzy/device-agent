@@ -15,7 +15,8 @@ describe("server runtime wiring", () => {
     };
 
     expect(packageJson.scripts.start).toBe("node dist/src/server.js");
-    expect(packageJson.scripts.dev).toContain("node dist/src/server.js");
+    expect(packageJson.scripts.dev).toContain("dist/src/server.js");
+    expect(packageJson.scripts.dev).toContain("--env-file-if-exists=.env");
   });
 
   it("detects direct execution for relative emitted server paths", () => {

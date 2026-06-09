@@ -21,6 +21,7 @@ import {
   type PlatformFetch,
   type SearchEquipmentParams
 } from "./platform-types.js";
+import { noopTracer, traceTimed, type Tracer } from "../../observability/trace.js";
 
 const TOKEN_REFRESH_SKEW_MS = 60_000;
 
@@ -28,16 +29,19 @@ export class JavaPlatformClient implements PlatformClient {
   readonly #config: PlatformClientConfig;
   readonly #fetch: PlatformFetch;
   readonly #clock: () => number;
+  readonly #tracer: Tracer;
   #session: PlatformAuthSession | undefined;
 
   constructor(options: {
     config: PlatformClientConfig;
     fetch?: PlatformFetch;
     clock?: () => number;
+    tracer?: Tracer;
   }) {
     this.#config = options.config;
     this.#fetch = options.fetch ?? nativeFetch;
     this.#clock = options.clock ?? (() => Date.now());
+    this.#tracer = options.tracer ?? noopTracer;
   }
 
   async login(): Promise<PlatformAuthSession> {
@@ -166,31 +170,93 @@ export class JavaPlatformClient implements PlatformClient {
     if (input.auth) {
       Object.assign(headers, buildPlatformHeaders(await this.login()));
     }
+    const url = buildUrl(input.baseUrl, input.path, input.query);
+    const requestInit = {
+      method: input.method,
+      headers,
+      ...(input.body ? { body: JSON.stringify(input.body) } : {})
+    };
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.#config.requestTimeoutMs);
     try {
-      const response = await this.#fetch(buildUrl(input.baseUrl, input.path, input.query), {
-        method: input.method,
-        headers,
-        ...(input.body ? { body: JSON.stringify(input.body) } : {}),
-        signal: controller.signal
+      this.#tracer.payload("debug", "platform.java_client", "request.input", {
+        operation: input.operation,
+        request: {
+          url,
+          ...requestInit,
+          query: input.query,
+          body: input.body
+        }
       });
+      const response = await traceTimed(
+        this.#tracer,
+        "platform.java_client",
+        "request",
+        {
+          operation: input.operation,
+          method: input.method,
+          path: input.path
+        },
+        () => this.#fetch(url, {
+          ...requestInit,
+          signal: controller.signal
+        })
+      );
 
       if (!response.ok) {
+        this.#tracer.payload("debug", "platform.java_client", "response.output", {
+          operation: input.operation,
+          response: {
+            ok: response.ok,
+            status: response.status
+          }
+        });
         throw new PlatformClientError(reasonForHttpFailure(input.operation), input.operation, safeMessage(input.operation));
       }
 
-      return await response.json();
+      const body = await response.json();
+      this.#tracer.payload("debug", "platform.java_client", "response.output", {
+        operation: input.operation,
+        response: {
+          ok: response.ok,
+          status: response.status,
+          body
+        }
+      });
+
+      return body;
     } catch (error) {
       if (error instanceof PlatformClientError) {
+        this.#tracer.payload("debug", "platform.java_client", "request.error", {
+          operation: input.operation,
+          error: {
+            name: error.name,
+            reason: error.reason,
+            operation: error.operation
+          }
+        });
         throw error;
       }
 
       if (isAbortError(error)) {
+        this.#tracer.payload("debug", "platform.java_client", "request.error", {
+          operation: input.operation,
+          error: {
+            name: error instanceof Error ? error.name : typeof error,
+            reason: "platform_timeout"
+          }
+        });
         throw new PlatformClientError("platform_timeout", input.operation, safeMessage(input.operation));
       }
 
+      this.#tracer.payload("debug", "platform.java_client", "request.error", {
+        operation: input.operation,
+        error: {
+          name: error instanceof Error ? error.name : typeof error,
+          message: error instanceof Error ? error.message : undefined
+        }
+      });
       throw new PlatformClientError(reasonForThrownFailure(input.operation), input.operation, safeMessage(input.operation));
     } finally {
       clearTimeout(timeout);

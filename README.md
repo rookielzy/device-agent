@@ -11,7 +11,7 @@ pnpm install
 pnpm dev
 ```
 
-The dev script builds TypeScript and starts the emitted Fastify server:
+The dev script builds TypeScript, loads local variables from `.env` when that file exists, and starts the emitted Fastify server:
 
 ```text
 http://127.0.0.1:3000
@@ -27,6 +27,9 @@ AGENT_DEVICE_CAPABILITY_MODE=simulated
 DEEPSEEK_API_KEY=
 DEEPSEEK_MODEL=deepseek-v4-flash
 ENABLE_DEBUG_SIMULATED_DEVICES=false
+ENABLE_AGENT_TRACE=false
+ENABLE_AGENT_TRACE_PAYLOADS=false
+AGENT_TRACE_SINK=stdout
 PLATFORM_USER_CENTER_BASE_URL=
 PLATFORM_IOT_BASE_URL=
 PLATFORM_VALIDATION_MOBILE=
@@ -36,6 +39,22 @@ PLATFORM_REQUEST_TIMEOUT_MS=5000
 ```
 
 `GET /debug/simulated-devices` is exposed automatically for localhost runtime hosts. Set `ENABLE_DEBUG_SIMULATED_DEVICES=true` only when deliberately exposing that developer endpoint from another host binding.
+
+Enable local execution tracing when you need to inspect the full request chain while validating DeepSeek or platform behavior:
+
+```bash
+ENABLE_AGENT_TRACE=true AGENT_TRACE_SINK=stderr pnpm dev
+```
+
+Trace events are newline-delimited JSON with a shared `traceId` plus `taskId` where available. The default trace is summarized and includes task creation, HTTP request completion, LangChain invocation, device-tool calls, simulated/platform service outcomes, pending-control confirmation, and final task persistence.
+
+To print full interface inputs and outputs for local debugging, enable payload tracing as well:
+
+```bash
+ENABLE_AGENT_TRACE=true ENABLE_AGENT_TRACE_PAYLOADS=true AGENT_TRACE_SINK=stderr pnpm dev
+```
+
+Payload trace includes HTTP request bodies and response payloads, LangChain invoke messages/results, tool inputs/outputs, and Java-platform HTTP request/response bodies. Trace fields redact common sensitive keys such as API keys, passwords, tokens, credentials, cookies, and authorization headers, but payload tracing can still expose business data, so keep it local.
 
 ## HTTP API
 

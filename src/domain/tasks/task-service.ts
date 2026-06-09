@@ -57,6 +57,11 @@ import {
   type IdGenerator,
   type StoredPendingControl
 } from "./task-types.js";
+import {
+  noopTracer,
+  runWithTraceContext,
+  type Tracer
+} from "../../observability/trace.js";
 
 const defaultClock: Clock = () => new Date();
 
@@ -75,6 +80,7 @@ export type TaskServiceOptions = {
   pendingControlIdGenerator?: IdGenerator;
   timelineEventIdGenerator?: IdGenerator;
   pendingControlTtlMs?: number;
+  tracer?: Tracer;
 };
 
 export type TaskDeviceService = Pick<SimulatedDeviceService, "readStatus" | "proposeControl" | "applyControl" | "debugSnapshot">;
@@ -89,6 +95,7 @@ export class TaskService {
   readonly #pendingControlIdGenerator: IdGenerator;
   readonly #timelineEventIdGenerator: IdGenerator;
   readonly #pendingControlTtlMs: number | undefined;
+  readonly #tracer: Tracer;
 
   constructor(options: TaskServiceOptions) {
     this.#interpreter = options.interpreter;
@@ -105,6 +112,7 @@ export class TaskService {
     this.#pendingControlIdGenerator = options.pendingControlIdGenerator ?? (() => `pending-${randomUUID()}`);
     this.#timelineEventIdGenerator = options.timelineEventIdGenerator ?? (() => `evt-${randomUUID()}`);
     this.#pendingControlTtlMs = options.pendingControlTtlMs;
+    this.#tracer = options.tracer ?? noopTracer;
   }
 
   get taskRepository(): TaskRepository {
@@ -117,14 +125,47 @@ export class TaskService {
 
   async createTask(originalText: string): Promise<TaskResult> {
     const taskId = this.#taskIdGenerator();
+    const taskTracer = this.#tracer.child({ taskId });
+
+    return runWithTraceContext(taskTracer.context, async () => {
+      taskTracer.emit("info", "domain.task_service", "create_task.started", {
+        originalTextLength: originalText.length
+      });
+
+      try {
+        const result = await this.#createTaskWithId(taskId, originalText);
+        taskTracer.emit(result.executionState === "completed" || result.executionState === "pending_confirmation" ? "info" : "warn", "domain.task_service", "create_task.completed", taskSummary(result));
+
+        return result;
+      } catch (error) {
+        taskTracer.emit("error", "domain.task_service", "create_task.failed", {
+          errorName: error instanceof Error ? error.name : typeof error
+        });
+
+        throw error;
+      }
+    });
+  }
+
+  async #createTaskWithId(taskId: string, originalText: string): Promise<TaskResult> {
     const timeline = this.#newTimeline();
     timeline.requestReceived();
 
     let proposal: AgentProposal;
     try {
-      proposal = parseAgentProposal(await this.#interpreter.interpret({ originalText }));
+      proposal = parseAgentProposal(await this.#interpreter.interpret({
+        originalText,
+        trace: this.#tracer.context
+      }));
+      this.#tracer.emit(proposal.kind === "parse_failure" ? "warn" : "info", "domain.task_service", "interpreter.proposal_received", {
+        proposalKind: proposal.kind,
+        proposalReason: proposal.kind === "parse_failure" ? proposal.reason : undefined
+      });
       timeline.modelInterpretation(proposal.kind === "parse_failure" ? "failed" : "succeeded", interpretationDetail(proposal));
     } catch (error) {
+      this.#tracer.emit("error", "domain.task_service", "interpreter.proposal_parse_failed", {
+        errorName: error instanceof Error ? error.name : typeof error
+      });
       timeline.modelInterpretation("failed", formatProposalParseError(error));
 
       return this.#saveTask({
@@ -239,10 +280,36 @@ export class TaskService {
   }
 
   confirmTask(taskId: string): TaskResult {
+    const taskTracer = this.#tracer.child({ taskId });
+
+    return runWithTraceContext(taskTracer.context, () => {
+      taskTracer.emit("info", "domain.task_service", "confirm_task.started");
+
+      try {
+        const result = this.#confirmTaskWithTrace(taskId);
+        taskTracer.emit(result.executionState === "completed" ? "info" : "warn", "domain.task_service", "confirm_task.completed", taskSummary(result));
+
+        return result;
+      } catch (error) {
+        taskTracer.emit("error", "domain.task_service", "confirm_task.failed", {
+          errorName: error instanceof Error ? error.name : typeof error
+        });
+
+        throw error;
+      }
+    });
+  }
+
+  #confirmTaskWithTrace(taskId: string): TaskResult {
     const stored = this.#taskRepository.get(taskId);
     const pending = this.#pendingControlRepository.getByTaskId(taskId);
 
     if (!stored.ok || !pending) {
+      this.#tracer.emit("warn", "domain.task_service", "pending_control.lookup_failed", {
+        storedTaskFound: stored.ok,
+        pendingControlFound: pending !== undefined
+      });
+
       return this.#confirmationFailureTask({
         taskId,
         originalText: stored.ok ? stored.task.originalText : "Confirm pending control",
@@ -258,9 +325,38 @@ export class TaskService {
   }
 
   confirmPendingControl(pendingControlId: string): TaskResult {
+    const taskTracer = this.#tracer.child({});
+
+    return runWithTraceContext(taskTracer.context, () => {
+      taskTracer.emit("info", "domain.task_service", "confirm_pending_control.started", {
+        pendingControlId
+      });
+
+      try {
+        const result = this.#confirmPendingControlWithTrace(pendingControlId);
+        taskTracer.emit(result.executionState === "completed" ? "info" : "warn", "domain.task_service", "confirm_pending_control.completed", taskSummary(result));
+
+        return result;
+      } catch (error) {
+        taskTracer.emit("error", "domain.task_service", "confirm_pending_control.failed", {
+          pendingControlId,
+          errorName: error instanceof Error ? error.name : typeof error
+        });
+
+        throw error;
+      }
+    });
+  }
+
+  #confirmPendingControlWithTrace(pendingControlId: string): TaskResult {
     const pending = this.#pendingControlRepository.getByPendingControlId(pendingControlId);
 
     if (!pending) {
+      this.#tracer.emit("warn", "domain.task_service", "pending_control.lookup_failed", {
+        pendingControlId,
+        pendingControlFound: false
+      });
+
       return this.#confirmationFailureTask({
         taskId: pendingControlId,
         originalText: "Confirm pending control",
@@ -273,6 +369,12 @@ export class TaskService {
 
     const stored = this.#taskRepository.get(pending.taskId);
     if (!stored.ok) {
+      this.#tracer.emit("warn", "domain.task_service", "pending_control.lookup_failed", {
+        pendingControlId,
+        taskId: pending.taskId,
+        storedTaskFound: false
+      });
+
       return this.#confirmationFailureTask({
         taskId: pending.taskId,
         originalText: "Confirm pending control",
@@ -287,10 +389,36 @@ export class TaskService {
   }
 
   rejectTask(taskId: string): TaskResult {
+    const taskTracer = this.#tracer.child({ taskId });
+
+    return runWithTraceContext(taskTracer.context, () => {
+      taskTracer.emit("info", "domain.task_service", "reject_task.started");
+
+      try {
+        const result = this.#rejectTaskWithTrace(taskId);
+        taskTracer.emit(result.executionState === "rejected" ? "info" : "warn", "domain.task_service", "reject_task.completed", taskSummary(result));
+
+        return result;
+      } catch (error) {
+        taskTracer.emit("error", "domain.task_service", "reject_task.failed", {
+          errorName: error instanceof Error ? error.name : typeof error
+        });
+
+        throw error;
+      }
+    });
+  }
+
+  #rejectTaskWithTrace(taskId: string): TaskResult {
     const stored = this.#taskRepository.get(taskId);
     const pending = this.#pendingControlRepository.getByTaskId(taskId);
 
     if (!stored.ok || !pending) {
+      this.#tracer.emit("warn", "domain.task_service", "pending_control.lookup_failed", {
+        storedTaskFound: stored.ok,
+        pendingControlFound: pending !== undefined
+      });
+
       return this.#confirmationFailureTask({
         taskId,
         originalText: stored.ok ? stored.task.originalText : "Reject pending control",
@@ -306,9 +434,38 @@ export class TaskService {
   }
 
   rejectPendingControl(pendingControlId: string): TaskResult {
+    const taskTracer = this.#tracer.child({});
+
+    return runWithTraceContext(taskTracer.context, () => {
+      taskTracer.emit("info", "domain.task_service", "reject_pending_control.started", {
+        pendingControlId
+      });
+
+      try {
+        const result = this.#rejectPendingControlWithTrace(pendingControlId);
+        taskTracer.emit(result.executionState === "rejected" ? "info" : "warn", "domain.task_service", "reject_pending_control.completed", taskSummary(result));
+
+        return result;
+      } catch (error) {
+        taskTracer.emit("error", "domain.task_service", "reject_pending_control.failed", {
+          pendingControlId,
+          errorName: error instanceof Error ? error.name : typeof error
+        });
+
+        throw error;
+      }
+    });
+  }
+
+  #rejectPendingControlWithTrace(pendingControlId: string): TaskResult {
     const pending = this.#pendingControlRepository.getByPendingControlId(pendingControlId);
 
     if (!pending) {
+      this.#tracer.emit("warn", "domain.task_service", "pending_control.lookup_failed", {
+        pendingControlId,
+        pendingControlFound: false
+      });
+
       return this.#confirmationFailureTask({
         taskId: pendingControlId,
         originalText: "Reject pending control",
@@ -321,6 +478,12 @@ export class TaskService {
 
     const stored = this.#taskRepository.get(pending.taskId);
     if (!stored.ok) {
+      this.#tracer.emit("warn", "domain.task_service", "pending_control.lookup_failed", {
+        pendingControlId,
+        taskId: pending.taskId,
+        storedTaskFound: false
+      });
+
       return this.#confirmationFailureTask({
         taskId: pending.taskId,
         originalText: "Reject pending control",
@@ -335,8 +498,16 @@ export class TaskService {
   }
 
   #confirmPendingControlRecord(storedTask: TaskResult, pending: StoredPendingControl): TaskResult {
+    this.#tracer.emit("info", "domain.task_service", "pending_control.validation_started", {
+      pendingControlId: pending.pendingControlId
+    });
     const validation = this.#pendingControlRepository.validatePending(pending.pendingControlId);
     if (!validation.ok) {
+      this.#tracer.emit("warn", "domain.task_service", "pending_control.validation_blocked", {
+        pendingControlId: pending.pendingControlId,
+        reason: validation.reason
+      });
+
       return this.#blockedConfirmationTask({
         baseTask: storedTask,
         pending: validation.record ?? pending,
@@ -349,11 +520,23 @@ export class TaskService {
 
     const timeline = this.#timelineFrom(storedTask.timeline);
     timeline.confirmationReceived("succeeded", "User confirmed pending control");
+    this.#tracer.emit("info", "domain.task_service", "simulated_control.apply_started", {
+      pendingControlId: pending.pendingControlId,
+      deviceId: validation.record.controlTarget.deviceId,
+      controlItem: validation.record.controlTarget.controlItem,
+      requestedValueType: typeof validation.record.controlTarget.requestedValue
+    });
     const applied = this.#deviceService.applyControl(validation.record.controlTarget);
+    this.#tracer.emit(applied.kind === "control_applied" ? "info" : "warn", "domain.task_service", "simulated_control.apply_completed", summarizeDeviceDomainResult(applied));
 
     if (applied.kind === "control_applied") {
       const transition = this.#pendingControlRepository.markConfirmed(pending.pendingControlId);
       if (!transition.ok) {
+        this.#tracer.emit("warn", "domain.task_service", "pending_control.transition_blocked", {
+          pendingControlId: pending.pendingControlId,
+          reason: transition.reason
+        });
+
         return this.#blockedConfirmationTask({
           baseTask: storedTask,
           pending: transition.record ?? pending,
@@ -401,6 +584,11 @@ export class TaskService {
   #rejectPendingControlRecord(storedTask: TaskResult, pending: StoredPendingControl): TaskResult {
     const transition = this.#pendingControlRepository.markRejected(pending.pendingControlId);
     if (!transition.ok) {
+      this.#tracer.emit("warn", "domain.task_service", "pending_control.transition_blocked", {
+        pendingControlId: pending.pendingControlId,
+        reason: transition.reason
+      });
+
       return this.#blockedConfirmationTask({
         baseTask: storedTask,
         pending: transition.record ?? pending,
@@ -413,6 +601,10 @@ export class TaskService {
 
     const timeline = this.#timelineFrom(storedTask.timeline);
     timeline.confirmationReceived("blocked", "User rejected pending control");
+    this.#tracer.emit("info", "domain.task_service", "pending_control.rejected", {
+      pendingControlId: pending.pendingControlId,
+      controlItemId: transition.record.target.controlId
+    });
 
     return this.#saveTask({
       ...storedTask,
@@ -430,7 +622,11 @@ export class TaskService {
     timeline: TimelineBuilder
   ): Promise<TaskResult> {
     timeline.serviceValidation("succeeded", "Validated status-query proposal");
+    this.#tracer.emit("info", "domain.task_service", "simulated_status.read_started", {
+      target: summarizeDeviceTarget(proposal.target)
+    });
     const result = this.#deviceService.readStatus(toDeviceTarget(proposal.target));
+    this.#tracer.emit(result.kind === "read_success" ? "info" : "warn", "domain.task_service", "simulated_status.read_completed", summarizeDeviceDomainResult(result));
 
     if (result.kind === "read_success") {
       timeline.deviceResolution("succeeded", `Resolved ${result.device.displayName}`);
@@ -484,7 +680,11 @@ export class TaskService {
     timeline: TimelineBuilder
   ): Promise<TaskResult> {
     timeline.serviceValidation("succeeded", "Validated control-request proposal");
+    this.#tracer.emit("info", "domain.task_service", "simulated_control.propose_started", {
+      target: summarizeDeviceTarget(proposal.target)
+    });
     const result = this.#deviceService.proposeControl(toControlTarget(proposal.target));
+    this.#tracer.emit(result.kind === "control_proposed" ? "info" : "warn", "domain.task_service", "simulated_control.propose_completed", summarizeDeviceDomainResult(result));
 
     if (result.kind === "control_proposed") {
       timeline.deviceResolution("succeeded", `Resolved ${result.device.displayName}`);
@@ -510,6 +710,12 @@ export class TaskService {
         createdAt: this.#clock().toISOString(),
         ...(pendingControl.expiresAt ? { expiresAt: pendingControl.expiresAt } : {}),
         status: "pending"
+      });
+      this.#tracer.emit("info", "domain.task_service", "pending_control.created", {
+        pendingControlId,
+        deviceId: result.controlItem.deviceId,
+        controlItemId: result.controlItem.controlId,
+        expiresAt: pendingControl.expiresAt
       });
 
       return this.#saveTask({
@@ -559,6 +765,7 @@ export class TaskService {
   ): Promise<TaskResult> {
     timeline.serviceValidation("succeeded", "Validated platform status-query proposal");
     appendPlatformTimeline(timeline, proposal.result);
+    this.#tracer.emit(proposal.result.kind === "platform_status_success" ? "info" : "warn", "domain.task_service", "platform_status.result_received", summarizePlatformProposalResult(proposal.result));
 
     if (proposal.result.kind === "platform_status_success") {
       return this.#saveTask({
@@ -733,11 +940,16 @@ export class TaskService {
   }
 
   #saveTask(task: TaskResult): TaskResult {
-    return this.#taskRepository.save(this.#taskResult(task));
+    const parsed = this.#taskResult(task);
+    const saved = this.#taskRepository.save(parsed);
+    this.#tracer.emit("debug", "domain.task_service", "task.saved", taskSummary(saved));
+
+    return saved;
   }
 
   #maybeSaveTask(task: TaskResult, persist: boolean): TaskResult {
     const parsed = this.#taskResult(task);
+    this.#tracer.emit("debug", "domain.task_service", persist ? "task.saved" : "task.not_persisted", taskSummary(parsed));
 
     return persist ? this.#taskRepository.save(parsed) : parsed;
   }
@@ -787,6 +999,113 @@ function finalEvents(timeline: TimelineBuilder, status: TimelineStatus, detail: 
   timeline.finalOutcome(status, detail);
 
   return timeline.events;
+}
+
+function taskSummary(task: TaskResult) {
+  return {
+    taskId: task.taskId,
+    classification: task.classification,
+    executionState: task.executionState,
+    outcomeReason: task.outcomeReason,
+    pendingControlId: task.pendingControl?.pendingControlId,
+    selectedDeviceCount: task.selectedContext.devices.length,
+    candidateCount: task.selectedContext.candidates.length,
+    timelineEventCount: task.timeline.length
+  };
+}
+
+function summarizeDeviceTarget(target: unknown) {
+  if (!isRecord(target)) {
+    return {
+      shape: typeof target
+    };
+  }
+
+  return {
+    room: stringField(target.room),
+    deviceType: stringField(target.deviceType),
+    dataItem: stringField(target.dataItem),
+    controlItem: stringField(target.controlItem),
+    requestedValueType: target.requestedValue === undefined ? undefined : typeof target.requestedValue,
+    phraseLength: typeof target.phrase === "string" ? target.phrase.length : undefined
+  };
+}
+
+function summarizeDeviceDomainResult(result: DeviceReadResult | DeviceControlProposalResult | DeviceControlApplyResult) {
+  switch (result.kind) {
+    case "read_success":
+      return {
+        kind: result.kind,
+        deviceId: result.device.deviceId,
+        dataItemCount: result.dataItems.length
+      };
+    case "control_proposed":
+      return {
+        kind: result.kind,
+        deviceId: result.device.deviceId,
+        controlItemId: result.controlItem.controlId,
+        requestedValueType: typeof result.controlItem.requestedValue
+      };
+    case "control_applied":
+      return {
+        kind: result.kind,
+        deviceId: result.device.deviceId,
+        controlItemId: result.controlItem.controlId,
+        updatedValueType: typeof result.updatedValue
+      };
+    case "ambiguous":
+      return {
+        kind: result.kind,
+        reason: result.reason,
+        candidateCount: result.candidates.length
+      };
+    case "not_found":
+      return {
+        kind: result.kind,
+        reason: result.reason
+      };
+    case "unavailable":
+    case "unsupported":
+      return {
+        kind: result.kind,
+        reason: result.reason,
+        deviceId: result.device?.deviceId
+      };
+    case "invalid_value":
+      return {
+        kind: result.kind,
+        reason: result.reason,
+        deviceId: result.device.deviceId
+      };
+  }
+}
+
+function summarizePlatformProposalResult(result: PlatformProposalResult) {
+  switch (result.kind) {
+    case "platform_status_success":
+      return {
+        kind: result.kind,
+        deviceId: result.device.deviceId,
+        dataItemCount: publicPlatformDataItems(result).length,
+        hasSwitchState: result.switchState !== undefined,
+        hasReturnAirTemperature: result.returnAirTemperature !== undefined
+      };
+    case "ambiguous":
+      return {
+        kind: result.kind,
+        reason: result.reason,
+        candidateCount: result.candidates.length,
+        stage: result.stage
+      };
+    case "unavailable":
+      return {
+        kind: result.kind,
+        reason: result.reason,
+        stage: result.stage,
+        deviceId: result.device?.deviceId,
+        candidateCount: result.candidates?.length
+      };
+  }
 }
 
 function planFor(input: {
@@ -1208,4 +1527,12 @@ function stripInvalidPendingControl(task: TaskResult): TaskResult {
   const { pendingControl: _pendingControl, ...withoutPending } = task;
 
   return withoutPending;
+}
+
+function stringField(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

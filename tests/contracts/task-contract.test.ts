@@ -32,7 +32,12 @@ describe("environment configuration", () => {
       deepseek: {
         model: "deepseek-v4-flash"
       },
-      enableDebugSimulatedDevices: false
+      enableDebugSimulatedDevices: false,
+      trace: {
+        enabled: false,
+        includePayloads: false,
+        sink: "stdout"
+      }
     });
   });
 
@@ -62,13 +67,32 @@ describe("environment configuration", () => {
         apiKey: "test-key",
         model: "deepseek-v4-pro"
       },
-      enableDebugSimulatedDevices: false
+      enableDebugSimulatedDevices: false,
+      trace: {
+        enabled: false,
+        includePayloads: false,
+        sink: "stdout"
+      }
     });
   });
 
   it("parses explicit debug simulated device opt-in", () => {
     expect(parseEnv({ ENABLE_DEBUG_SIMULATED_DEVICES: "true" }).enableDebugSimulatedDevices).toBe(true);
     expect(parseEnv({ ENABLE_DEBUG_SIMULATED_DEVICES: "0" }).enableDebugSimulatedDevices).toBe(false);
+  });
+
+  it("parses explicit local agent trace settings", () => {
+    expect(parseEnv({ ENABLE_AGENT_TRACE: "true" }).trace).toEqual({
+      enabled: true,
+      includePayloads: false,
+      sink: "stdout"
+    });
+    expect(parseEnv({ ENABLE_AGENT_TRACE: "1", ENABLE_AGENT_TRACE_PAYLOADS: "true", AGENT_TRACE_SINK: "stderr" }).trace).toEqual({
+      enabled: true,
+      includePayloads: true,
+      sink: "stderr"
+    });
+    expect(() => parseEnv({ AGENT_TRACE_SINK: "file" })).toThrow(ConfigError);
   });
 
   it("rejects invalid ports and unknown interpreter modes", () => {

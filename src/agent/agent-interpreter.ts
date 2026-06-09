@@ -1,4 +1,5 @@
 import type { AgentProposal } from "./agent-schemas.js";
+import type { TraceContext } from "../observability/trace.js";
 
 export {
   agentProposalSchema,
@@ -20,6 +21,7 @@ export {
 
 export type AgentInterpreterInput = {
   originalText: string;
+  trace?: TraceContext;
 };
 
 export type AgentInterpreter = {

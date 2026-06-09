@@ -8,6 +8,7 @@ import {
   type AgentInvoker,
   type CreateDeepSeekAgentInput
 } from "./langchain-deepseek-interpreter.js";
+import type { Tracer } from "../observability/trace.js";
 
 export type CreateAgentInterpreterOptions = {
   config: AppConfig;
@@ -15,6 +16,7 @@ export type CreateAgentInterpreterOptions = {
   platformService?: Pick<PlatformCapabilityService, "listProjectsOrAreas" | "searchDevices" | "getEquipmentDetail" | "getRuntimeParams" | "readAirConditionerStatus">;
   deepseekAgent?: AgentInvoker;
   deepseekAgentFactory?: (input: CreateDeepSeekAgentInput) => AgentInvoker;
+  tracer?: Tracer;
 };
 
 export function createAgentInterpreter(options: CreateAgentInterpreterOptions): AgentInterpreter {
@@ -33,7 +35,8 @@ export function createAgentInterpreter(options: CreateAgentInterpreterOptions): 
         ...(options.deviceService ? { deviceService: options.deviceService } : {}),
         ...(options.platformService ? { platformService: options.platformService } : {}),
         ...(options.deepseekAgent ? { agent: options.deepseekAgent } : {}),
-        ...(options.deepseekAgentFactory ? { agentFactory: options.deepseekAgentFactory } : {})
+        ...(options.deepseekAgentFactory ? { agentFactory: options.deepseekAgentFactory } : {}),
+        ...(options.tracer ? { tracer: options.tracer } : {})
       });
   }
 }
