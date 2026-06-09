@@ -10,7 +10,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/src/server.js",
-    "dev": "pnpm build && node dist/src/server.js",
+    "dev": "pnpm build && node --env-file-if-exists=.env dist/src/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

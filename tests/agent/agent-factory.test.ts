@@ -30,7 +30,12 @@ describe("createAgentInterpreter", () => {
         apiKey: "test-key",
         model: "deepseek-test"
       },
-      enableDebugSimulatedDevices: false
+      enableDebugSimulatedDevices: false,
+      trace: {
+        enabled: false,
+        includePayloads: false,
+        sink: "stdout"
+      }
     };
     const interpreter = createAgentInterpreter({
       config,
@@ -69,7 +74,12 @@ describe("createAgentInterpreter", () => {
         apiKey: "test-key",
         model: "deepseek-test"
       },
-      enableDebugSimulatedDevices: false
+      enableDebugSimulatedDevices: false,
+      trace: {
+        enabled: false,
+        includePayloads: false,
+        sink: "stdout"
+      }
     };
     const deviceService = {
       readStatus(): DeviceReadResult {
@@ -131,7 +141,12 @@ describe("createAgentInterpreter", () => {
         validationProjectId: "270544150790145",
         requestTimeoutMs: 5000
       },
-      enableDebugSimulatedDevices: false
+      enableDebugSimulatedDevices: false,
+      trace: {
+        enabled: false,
+        includePayloads: false,
+        sink: "stdout"
+      }
     };
     const platformService = {
       async listProjectsOrAreas() {

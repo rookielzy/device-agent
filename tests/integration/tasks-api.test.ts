@@ -10,6 +10,7 @@ import {
   vagueBedroomStatusProposal
 } from "../fixtures/task-fixtures.js";
 import { createTestApi } from "./api-test-helpers.js";
+import { createTracer, type TraceEvent } from "../../src/observability/trace.js";
 
 const forbiddenProviderFields = [
   "tool_calls",
@@ -20,6 +21,52 @@ const forbiddenProviderFields = [
 ];
 
 describe("Task HTTP API", () => {
+  it("traces HTTP request and response payloads when payload tracing is enabled", async () => {
+    const events: TraceEvent[] = [];
+    const tracer = createTracer({
+      enabled: true,
+      includePayloads: true,
+      sink: (event) => events.push(event),
+      traceIdGenerator: () => "trace-http-001"
+    });
+    const api = createTestApi([livingRoomStatusProposal], { tracer });
+
+    try {
+      const response = await api.app.inject({
+        method: "POST",
+        url: "/tasks",
+        payload: { text: "Is the living room air conditioner running?" }
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(events.find((event) => event.event === "request.body")?.fields).toMatchObject({
+        request: {
+          method: "POST",
+          url: "/tasks",
+          body: {
+            text: "Is the living room air conditioner running?"
+          }
+        }
+      });
+      expect(events.find((event) => event.event === "response.output")?.fields).toMatchObject({
+        response: {
+          statusCode: 201,
+          payload: {
+            taskId: "task-001",
+            executionState: "completed"
+          }
+        }
+      });
+      expect(events.find((event) => event.event === "request.completed")?.fields).toMatchObject({
+        method: "POST",
+        url: "/tasks",
+        statusCode: 201
+      });
+    } finally {
+      await api.app.close();
+    }
+  });
+
   it("creates and inspects a completed air-conditioner status task", async () => {
     const api = createTestApi([livingRoomStatusProposal]);
 

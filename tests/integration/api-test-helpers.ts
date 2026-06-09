@@ -3,6 +3,7 @@ import type { AgentInterpreter, AgentProposal } from "../../src/agent/agent-inte
 import { buildApp } from "../../src/app.js";
 import { SimulatedDeviceService } from "../../src/domain/devices/simulated-device-service.js";
 import { TaskService } from "../../src/domain/tasks/task-service.js";
+import type { Tracer } from "../../src/observability/trace.js";
 import {
   createFixedClock,
   createIdSequence,
@@ -20,6 +21,7 @@ export type TestApi = {
 export function createTestApi(proposals: AgentProposal[], options: {
   clock?: Clock;
   pendingControlTtlMs?: number;
+  tracer?: Tracer;
 } = {}): TestApi {
   const interpreter = createSequenceInterpreter(proposals);
   const clock = options.clock ?? createFixedClock();
@@ -31,13 +33,15 @@ export function createTestApi(proposals: AgentProposal[], options: {
     taskIdGenerator: createIdSequence("task"),
     pendingControlIdGenerator: createIdSequence("pending"),
     timelineEventIdGenerator: createIdSequence("evt"),
+    ...(options.tracer ? { tracer: options.tracer } : {}),
     ...(options.pendingControlTtlMs !== undefined ? { pendingControlTtlMs: options.pendingControlTtlMs } : {})
   });
   const app = buildApp({
     dependencies: {
       taskService,
       simulatedDeviceService
-    }
+    },
+    ...(options.tracer ? { tracer: options.tracer } : {})
   });
 
   return {

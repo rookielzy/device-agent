@@ -17,6 +17,7 @@ import type {
   DeviceReadResult
 } from "../domain/devices/device-results.js";
 import { SimulatedDeviceService } from "../domain/devices/simulated-device-service.js";
+import { noopTracer, traceTimed, type Tracer } from "../observability/trace.js";
 
 export type DeviceToolResult =
   | {
@@ -53,10 +54,33 @@ type DeviceToolDevice = Pick<
 
 export type DeviceToolSet = ReturnType<typeof createDeviceTools>;
 
-export function createDeviceTools(deviceService: Pick<SimulatedDeviceService, "readStatus" | "proposeControl" | "debugSnapshot">) {
+export function createDeviceTools(
+  deviceService: Pick<SimulatedDeviceService, "readStatus" | "proposeControl" | "debugSnapshot">,
+  tracer: Tracer = noopTracer
+) {
   return [
     tool(
-      async (target) => serializeReadResult(deviceService.readStatus(toDeviceTarget(target))),
+      async (target) => traceTimed(
+        tracer,
+        "agent.tool.simulated_device",
+        "read_status",
+        {
+          toolName: "read_simulated_device_status",
+          target: summarizeTarget(target)
+        },
+        async () => {
+          tracer.payload("debug", "agent.tool.simulated_device", "read_status.input", {
+            input: target
+          });
+          const result = serializeReadResult(deviceService.readStatus(toDeviceTarget(target)));
+          tracer.emit(result.ok ? "info" : "warn", "agent.tool.simulated_device", "read_status.completed", summarizeToolResult(result));
+          tracer.payload("debug", "agent.tool.simulated_device", "read_status.output", {
+            output: result
+          });
+
+          return result;
+        }
+      ),
       {
         name: "read_simulated_device_status",
         description: "Resolve a simulated device target and return readable status facts without mutation.",
@@ -64,7 +88,27 @@ export function createDeviceTools(deviceService: Pick<SimulatedDeviceService, "r
       }
     ),
     tool(
-      async (target) => serializeControlResult(deviceService.proposeControl(toControlTarget(target))),
+      async (target) => traceTimed(
+        tracer,
+        "agent.tool.simulated_device",
+        "propose_control",
+        {
+          toolName: "propose_simulated_device_control",
+          target: summarizeTarget(target)
+        },
+        async () => {
+          tracer.payload("debug", "agent.tool.simulated_device", "propose_control.input", {
+            input: target
+          });
+          const result = serializeControlResult(deviceService.proposeControl(toControlTarget(target)));
+          tracer.emit(result.ok ? "info" : "warn", "agent.tool.simulated_device", "propose_control.completed", summarizeToolResult(result));
+          tracer.payload("debug", "agent.tool.simulated_device", "propose_control.output", {
+            output: result
+          });
+
+          return result;
+        }
+      ),
       {
         name: "propose_simulated_device_control",
         description: "Validate a simulated control request and return proposal facts without applying the control.",
@@ -72,11 +116,30 @@ export function createDeviceTools(deviceService: Pick<SimulatedDeviceService, "r
       }
     ),
     tool(
-      async () => ({
-        ok: true as const,
-        kind: "catalog_snapshot" as const,
-        devices: deviceService.debugSnapshot().map(toToolDevice)
-      }),
+      async () => traceTimed(
+        tracer,
+        "agent.tool.simulated_device",
+        "list_candidates",
+        {
+          toolName: "list_simulated_device_candidates"
+        },
+        async () => {
+          tracer.payload("debug", "agent.tool.simulated_device", "list_candidates.input", {
+            input: {}
+          });
+          const result = {
+            ok: true as const,
+            kind: "catalog_snapshot" as const,
+            devices: deviceService.debugSnapshot().map(toToolDevice)
+          };
+          tracer.emit("info", "agent.tool.simulated_device", "list_candidates.completed", summarizeToolResult(result));
+          tracer.payload("debug", "agent.tool.simulated_device", "list_candidates.output", {
+            output: result
+          });
+
+          return result;
+        }
+      ),
       {
         name: "list_simulated_device_candidates",
         description: "Return a compact simulated-device catalog for resolving ambiguous user language.",
@@ -163,4 +226,50 @@ function toToolDevice(device: SimulatedDeviceContext): DeviceToolDevice {
     readableValues: device.readableValues,
     writableControls: device.writableControls
   };
+}
+
+function summarizeTarget(target: unknown) {
+  if (!isRecord(target)) {
+    return {
+      shape: typeof target
+    };
+  }
+
+  return {
+    room: stringField(target.room),
+    deviceType: stringField(target.deviceType),
+    dataItem: stringField(target.dataItem),
+    controlItem: stringField(target.controlItem),
+    requestedValueType: target.requestedValue === undefined ? undefined : typeof target.requestedValue,
+    phraseLength: typeof target.phrase === "string" ? target.phrase.length : undefined
+  };
+}
+
+function summarizeToolResult(result: DeviceToolResult) {
+  if (result.ok) {
+    return {
+      ok: true,
+      kind: result.kind,
+      deviceId: result.kind === "catalog_snapshot" ? undefined : result.device.deviceId,
+      dataItemCount: result.kind === "read_success" ? result.dataItems.length : undefined,
+      controlItemId: result.kind === "control_proposed" ? result.controlItem.controlId : undefined,
+      candidateCount: result.kind === "catalog_snapshot" ? result.devices.length : undefined
+    };
+  }
+
+  return {
+    ok: false,
+    kind: result.kind,
+    reason: result.reason,
+    deviceId: result.device?.deviceId,
+    candidateCount: result.candidates?.length
+  };
+}
+
+function stringField(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

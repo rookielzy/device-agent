@@ -13,6 +13,11 @@ import { TaskService, type TaskServiceOptions } from "./domain/tasks/task-servic
 import type { AppConfig } from "./config/env.js";
 import { registerSimulatedDeviceRoutes } from "./routes/simulated-devices.js";
 import { registerTaskRoutes } from "./routes/tasks.js";
+import {
+  noopTracer,
+  runWithTraceContext,
+  type Tracer
+} from "./observability/trace.js";
 
 const DEFAULT_BODY_LIMIT_BYTES = 16_384;
 export type PlatformCapabilityServiceDependency = Pick<
@@ -32,26 +37,30 @@ export type BuildAppOptions = {
   simulatedDeviceService?: SimulatedDeviceService;
   platformCapabilityService?: PlatformCapabilityServiceDependency;
   agentInterpreterFactory?: typeof createAgentInterpreter;
-  taskServiceOptions?: Omit<TaskServiceOptions, "interpreter" | "deviceService">;
+  taskServiceOptions?: Omit<TaskServiceOptions, "interpreter" | "deviceService" | "tracer">;
   fastify?: FastifyServerOptions;
   exposeDebugRoutes?: boolean;
+  tracer?: Tracer;
 };
 
 export function createAppDependencies(options: Omit<BuildAppOptions, "dependencies" | "fastify"> = {}): AppDependencies {
   const config = options.config;
+  const tracer = options.tracer ?? noopTracer;
   const simulatedDeviceService = options.simulatedDeviceService ?? new SimulatedDeviceService({
     ...(options.taskServiceOptions?.clock ? { clock: options.taskServiceOptions.clock } : {})
   });
   const platformCapabilityService: PlatformCapabilityServiceDependency | undefined =
-    options.platformCapabilityService ?? (config ? createPlatformCapabilityService(config) : undefined);
+    options.platformCapabilityService ?? (config ? createPlatformCapabilityService(config, tracer) : undefined);
   const interpreter = options.interpreter ?? (options.agentInterpreterFactory ?? createAgentInterpreter)({
     config: requireConfig(config),
     deviceService: simulatedDeviceService,
-    ...(platformCapabilityService ? { platformService: platformCapabilityService } : {})
+    ...(platformCapabilityService ? { platformService: platformCapabilityService } : {}),
+    tracer
   });
   const taskService = new TaskService({
     interpreter,
     deviceService: simulatedDeviceService,
+    tracer,
     ...(options.taskServiceOptions ?? {})
   });
 
@@ -61,7 +70,7 @@ export function createAppDependencies(options: Omit<BuildAppOptions, "dependenci
   };
 }
 
-function createPlatformCapabilityService(config: AppConfig): PlatformCapabilityService | undefined {
+function createPlatformCapabilityService(config: AppConfig, tracer: Tracer): PlatformCapabilityService | undefined {
   if (config.deviceCapabilityMode !== "platform") {
     return undefined;
   }
@@ -73,7 +82,8 @@ function createPlatformCapabilityService(config: AppConfig): PlatformCapabilityS
   return new PlatformCapabilityService({
     validationProjectId: config.platform.validationProjectId,
     client: new JavaPlatformClient({
-      config: config.platform
+      config: config.platform,
+      tracer
     })
   });
 }
@@ -85,9 +95,66 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
   const dependencies = options.dependencies ?? createAppDependencies(options);
   const exposeDebugRoutes = options.exposeDebugRoutes ?? true;
+  const tracer = options.tracer ?? noopTracer;
+
+  app.addHook("onRequest", (request, _reply, done) => {
+    const requestTracer = tracer.child({});
+
+    runWithTraceContext(requestTracer.context, () => {
+      requestTracer.emit("info", "http.fastify", "request.started", {
+        method: request.method,
+        url: request.url
+      });
+      requestTracer.payload("debug", "http.fastify", "request.input", {
+        request: {
+          method: request.method,
+          url: request.url,
+          headers: request.headers
+        }
+      });
+      done();
+    });
+  });
+
+  app.addHook("preHandler", (request, _reply, done) => {
+    tracer.payload("debug", "http.fastify", "request.body", {
+      request: {
+        method: request.method,
+        url: request.url,
+        body: request.body
+      }
+    });
+    done();
+  });
+
+  app.addHook("preSerialization", (_request, reply, payload, done) => {
+    tracer.payload("debug", "http.fastify", "response.output", {
+      response: {
+        statusCode: reply.statusCode,
+        payload
+      }
+    });
+    done(null, payload);
+  });
+
+  app.addHook("onResponse", (request, reply, done) => {
+    tracer.emit(reply.statusCode >= 500 ? "error" : "info", "http.fastify", "request.completed", {
+      method: request.method,
+      url: request.url,
+      statusCode: reply.statusCode
+    });
+    done();
+  });
 
   app.setErrorHandler((error, _request, reply) => {
     const shaped = shapeRouteError(error);
+    tracer.emit("warn", "http.fastify", "request.failed", {
+      statusCode: shaped.error.statusCode,
+      code: shaped.error.code
+    });
+    tracer.payload("debug", "http.fastify", "error.output", {
+      response: shaped
+    });
     void reply.status(shaped.error.statusCode).send(shaped);
   });
 

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const interpreterModeSchema = z.enum(["fake", "deepseek"]);
 const deviceCapabilityModeSchema = z.enum(["simulated", "platform"]);
+const traceSinkSchema = z.enum(["stdout", "stderr"]);
 const DEFAULT_PLATFORM_VALIDATION_PROJECT_ID = "270544150790145";
 const DEFAULT_PLATFORM_REQUEST_TIMEOUT_MS = 5_000;
 const booleanEnvSchema = z
@@ -74,7 +75,10 @@ const rawEnvSchema = z.object({
 
       return timeout;
     }),
-  ENABLE_DEBUG_SIMULATED_DEVICES: booleanEnvSchema
+  ENABLE_DEBUG_SIMULATED_DEVICES: booleanEnvSchema,
+  ENABLE_AGENT_TRACE: booleanEnvSchema,
+  ENABLE_AGENT_TRACE_PAYLOADS: booleanEnvSchema,
+  AGENT_TRACE_SINK: traceSinkSchema.default("stdout")
 });
 
 export type InterpreterMode = z.infer<typeof interpreterModeSchema>;
@@ -98,6 +102,11 @@ export type AppConfig = {
     requestTimeoutMs: number;
   };
   enableDebugSimulatedDevices: boolean;
+  trace: {
+    enabled: boolean;
+    includePayloads: boolean;
+    sink: "stdout" | "stderr";
+  };
 };
 
 export class ConfigError extends Error {
@@ -176,7 +185,12 @@ export function parseEnv(input: NodeJS.ProcessEnv = process.env): AppConfig {
       model: parsed.data.DEEPSEEK_MODEL
     },
     ...(platform ? { platform } : {}),
-    enableDebugSimulatedDevices: parsed.data.ENABLE_DEBUG_SIMULATED_DEVICES
+    enableDebugSimulatedDevices: parsed.data.ENABLE_DEBUG_SIMULATED_DEVICES,
+    trace: {
+      enabled: parsed.data.ENABLE_AGENT_TRACE,
+      includePayloads: parsed.data.ENABLE_AGENT_TRACE_PAYLOADS,
+      sink: parsed.data.AGENT_TRACE_SINK
+    }
   };
 }
 

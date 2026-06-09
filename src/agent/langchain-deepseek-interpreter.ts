@@ -15,6 +15,7 @@ import { createDeviceTools, type DeviceToolSet } from "./device-tools.js";
 import { createPlatformDeviceTools, type PlatformDeviceToolSet } from "./platform-device-tools.js";
 import { SimulatedDeviceService } from "../domain/devices/simulated-device-service.js";
 import type { PlatformCapabilityService } from "../domain/platform/platform-capability-service.js";
+import { noopTracer, traceTimed, type Tracer } from "../observability/trace.js";
 
 export type AgentInvoker = {
   invoke(input: { messages: Array<{ role: "user"; content: string }> }): Promise<{
@@ -44,6 +45,7 @@ export type LangChainDeepSeekInterpreterOptions = {
   deviceCapabilityMode?: "simulated" | "platform";
   agent?: AgentInvoker;
   agentFactory?: (input: CreateDeepSeekAgentInput) => AgentInvoker;
+  tracer?: Tracer;
 };
 
 export type CreateDeepSeekAgentInput = {
@@ -55,60 +57,124 @@ export type CreateDeepSeekAgentInput = {
 
 export class LangChainDeepSeekInterpreter implements AgentInterpreter {
   readonly #agent: AgentInvoker;
+  readonly #tracer: Tracer;
 
   constructor(options: LangChainDeepSeekInterpreterOptions) {
     const deviceCapabilityMode = options.deviceCapabilityMode ?? "simulated";
+    this.#tracer = options.tracer ?? noopTracer;
     this.#agent =
       options.agent ??
       (options.agentFactory ?? createDeepSeekAgent)({
         apiKey: options.apiKey,
         model: options.model,
         tools: deviceCapabilityMode === "platform"
-          ? createPlatformDeviceTools(requirePlatformService(options.platformService))
-          : createDeviceTools(options.deviceService ?? new SimulatedDeviceService()),
+          ? createPlatformDeviceTools(requirePlatformService(options.platformService), this.#tracer)
+          : createDeviceTools(options.deviceService ?? new SimulatedDeviceService(), this.#tracer),
         systemPrompt: deviceCapabilityMode === "platform"
           ? DEEPSEEK_PLATFORM_INTERPRETER_SYSTEM_PROMPT
           : DEEPSEEK_INTERPRETER_SYSTEM_PROMPT
       });
     this.#deviceCapabilityMode = deviceCapabilityMode;
+    this.#tracer.emit("info", "agent.langchain_deepseek", "interpreter.initialized", {
+      model: options.model,
+      deviceCapabilityMode
+    });
   }
 
   readonly #deviceCapabilityMode: "simulated" | "platform";
 
   async interpret(input: AgentInterpreterInput): Promise<AgentProposal> {
+    const tracer = this.#tracer.child(input.trace ?? {});
+    const prompt = buildInterpreterUserPrompt(input.originalText, {
+      platformMode: this.#deviceCapabilityMode === "platform"
+    });
+
+    tracer.emit("info", "agent.langchain_deepseek", "interpret.started", {
+      deviceCapabilityMode: this.#deviceCapabilityMode,
+      originalTextLength: input.originalText.length,
+      promptLength: prompt.length
+    });
+
     try {
-      const result = await this.#agent.invoke({
-        messages: [
-          {
-            role: "user",
-            content: buildInterpreterUserPrompt(input.originalText, {
-              platformMode: this.#deviceCapabilityMode === "platform"
-            })
-          }
-        ]
+      const messages: Array<{ role: "user"; content: string }> = [
+        {
+          role: "user",
+          content: prompt
+        }
+      ];
+      tracer.payload("debug", "agent.langchain_deepseek", "agent.invoke.input", {
+        input: {
+          messages
+        }
+      });
+      const result = await traceTimed(
+        tracer,
+        "agent.langchain_deepseek",
+        "agent.invoke",
+        {
+          deviceCapabilityMode: this.#deviceCapabilityMode
+        },
+        () => this.#agent.invoke({ messages })
+      );
+      tracer.payload("debug", "agent.langchain_deepseek", "agent.invoke.output", {
+        output: result
+      });
+      const proposal = parseAgentResult(result);
+
+      tracer.emit(proposal.kind === "parse_failure" ? "warn" : "info", "agent.langchain_deepseek", "interpret.completed", {
+        proposalKind: proposal.kind,
+        proposalReason: proposal.kind === "parse_failure" ? proposal.reason : undefined,
+        resultShape: resultShape(result)
       });
 
-      return parseAgentResult(result);
+      return proposal;
     } catch (error) {
       if (error instanceof ZodError) {
+        tracer.emit("warn", "agent.langchain_deepseek", "interpret.failed", {
+          reason: "schema_invalid",
+          issue: error.issues[0]?.message ?? "structured proposal failed validation"
+        });
+
         return parseFailure("schema_invalid", error.issues[0]?.message ?? "structured proposal failed validation");
       }
 
       if (error instanceof MissingModelProposalError) {
+        tracer.emit("warn", "agent.langchain_deepseek", "interpret.failed", {
+          reason: "missing_structured_response"
+        });
+
         return parseFailure("missing_structured_response", "LangChain agent did not return structuredResponse or assistant JSON content");
       }
 
       if (error instanceof ModelOutputJsonParseError) {
+        tracer.emit("warn", "agent.langchain_deepseek", "interpret.failed", {
+          reason: "structured_output_parse_failure"
+        });
+
         return parseFailure("structured_output_parse_failure", "LangChain agent returned content that was not valid proposal JSON");
       }
 
       if (error instanceof StructuredOutputParsingError) {
+        tracer.emit("warn", "agent.langchain_deepseek", "interpret.failed", {
+          reason: "structured_output_parse_failure"
+        });
+
         return parseFailure("structured_output_parse_failure", "LangChain could not parse model output as the proposal schema");
       }
 
       if (error instanceof Error) {
+        tracer.emit("error", "agent.langchain_deepseek", "interpret.failed", {
+          reason: "adapter_error",
+          errorName: error.name
+        });
+
         return parseFailure("adapter_error", "LangChain adapter failed to interpret the request");
       }
+
+      tracer.emit("error", "agent.langchain_deepseek", "interpret.failed", {
+        reason: "adapter_error",
+        errorName: typeof error
+      });
 
       return parseFailure("adapter_error", "LangChain adapter failed to interpret the request");
     }
@@ -164,6 +230,26 @@ function parseAgentResult(result: Awaited<ReturnType<AgentInvoker["invoke"]>>): 
   }
 
   return parseAgentProposal(parseJsonContent(content));
+}
+
+function resultShape(result: Awaited<ReturnType<AgentInvoker["invoke"]>>): string {
+  if (result.structuredResponse !== undefined) {
+    return "structuredResponse";
+  }
+
+  if (result.output !== undefined) {
+    return "output";
+  }
+
+  if (result.content !== undefined) {
+    return "content";
+  }
+
+  if (result.messages !== undefined) {
+    return "messages";
+  }
+
+  return "empty";
 }
 
 function extractAgentContent(result: Awaited<ReturnType<AgentInvoker["invoke"]>>): unknown {

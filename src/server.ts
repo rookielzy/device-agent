@@ -11,12 +11,14 @@ import { createAgentInterpreter, type CreateAgentInterpreterOptions } from "./ag
 import type { AgentInterpreter } from "./agent/agent-interpreter.js";
 import { parseEnv, type AppConfig } from "./config/env.js";
 import { SimulatedDeviceService } from "./domain/devices/simulated-device-service.js";
+import { createConsoleTracer, noopTracer, type Tracer } from "./observability/trace.js";
 
 export type RuntimeDependencyOverrides = {
   simulatedDeviceService?: SimulatedDeviceService;
   platformCapabilityService?: PlatformCapabilityServiceDependency;
   interpreter?: AgentInterpreter;
   agentInterpreterFactory?: (options: CreateAgentInterpreterOptions) => AgentInterpreter;
+  tracer?: Tracer;
 };
 
 export type StartServerOptions = {
@@ -27,12 +29,15 @@ export type StartServerOptions = {
 };
 
 export function createRuntimeDependencies(config: AppConfig, overrides: RuntimeDependencyOverrides = {}): AppDependencies {
+  const tracer = overrides.tracer ?? tracerFromConfig(config);
+
   return createAppDependencies({
     config,
     ...(overrides.simulatedDeviceService ? { simulatedDeviceService: overrides.simulatedDeviceService } : {}),
     ...(overrides.platformCapabilityService ? { platformCapabilityService: overrides.platformCapabilityService } : {}),
     ...(overrides.interpreter ? { interpreter: overrides.interpreter } : {}),
-    agentInterpreterFactory: overrides.agentInterpreterFactory ?? createAgentInterpreter
+    agentInterpreterFactory: overrides.agentInterpreterFactory ?? createAgentInterpreter,
+    tracer
   });
 }
 
@@ -76,6 +81,16 @@ function formatStartupError(error: unknown): string {
 
 export function shouldExposeDebugRoutes(config: AppConfig): boolean {
   return config.enableDebugSimulatedDevices || config.host === "127.0.0.1" || config.host === "localhost";
+}
+
+function tracerFromConfig(config: AppConfig): Tracer {
+  return config.trace.enabled
+    ? createConsoleTracer({
+        enabled: true,
+        includePayloads: config.trace.includePayloads,
+        sink: config.trace.sink
+      })
+    : noopTracer;
 }
 
 if (isDirectExecution()) {

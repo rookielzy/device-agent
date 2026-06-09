@@ -25,6 +25,11 @@ describe("developer documentation regression", () => {
     expect(readme).toContain("POST /tasks/:taskId/confirm");
     expect(readme).toContain("POST /tasks/:taskId/reject");
     expect(readme).toContain("GET /debug/simulated-devices");
+    expect(readme).toContain("ENABLE_AGENT_TRACE=true");
+    expect(readme).toContain("ENABLE_AGENT_TRACE_PAYLOADS=true");
+    expect(readme).toContain("newline-delimited JSON");
+    expect(readme).toContain("HTTP request bodies and response payloads");
+    expect(readme).toContain("traceId");
   });
 
   it("documents default offline checks and opt-in live DeepSeek smoke validation", () => {
