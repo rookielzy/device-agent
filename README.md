@@ -111,7 +111,7 @@ DEEPSEEK_API_KEY=...
 DEEPSEEK_MODEL=deepseek-v4-flash
 ```
 
-The LangChain adapter uses `ChatDeepSeek`, simulated-device tools, and structured output. It returns only provider-neutral proposals to `TaskService`; controls are proposed for later confirmation and are not executed by the adapter.
+The LangChain adapter uses `ChatDeepSeek`, device tools, DeepSeek JSON output mode, and local schema validation. It returns only provider-neutral proposals to `TaskService`; controls are proposed for later confirmation and are not executed by the adapter.
 
 Internal real-platform query mode is a separate opt-in device capability source:
 
