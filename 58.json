@@ -1,0 +1,763 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "默认模块",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [],
+  "paths": {
+    "/option/project": {
+      "get": {
+        "summary": "项目-下拉框",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "entityId",
+            "in": "query",
+            "description": "企业(客户)ID",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "includeBusinessGrouping",
+            "in": "query",
+            "description": "是否需要返回项目下的业务系统ID 1-是",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "x-user-header",
+            "in": "header",
+            "description": "",
+            "example": "%7B%22userId%22%3A1%2C%22mobile%22%3A%22ek-admin%22%2C%22username%22%3A%22admin%22%2C%22grantedAuthority%22%3A%5B%22EntityManage%22%2C%22DeleteTemplateBackup%22%2C%22ControllerConfig%22%2C%22SyncEquipBase%22%2C%22EquipMaintain%22%2C%22NoticeManage%22%2C%22HydraulicBalance%22%2C%22AlarmRecovery%22%2C%22EquipUnbindSystem%22%2C%22ConfigSplitParams%22%2C%22SuperAdmin%22%2C%22EquipModel%22%2C%22SplitEquipConfigParams%22%2C%22SaveIndustry%22%2C%22ReuseRunStrategy%22%2C%22RemoteControl%22%2C%22Special%22%2C%22EquipSelfTest%22%2C%22EquipAlias%22%2C%22DeleteRole%22%2C%22TransferRegion%22%2C%22AlarmList%22%2C%22EntityList%22%2C%22TagManage%22%2C%22ProjectService%22%2C%22EnergyPlanMode%22%2C%22EditCustomerMember%22%2C%22ExportEquipTemplate%22%2C%22DeleteMember%22%2C%22GatewayExchange%22%2C%22ProjectConfig%22%2C%22DeleteEquipModel%22%2C%22ConfigPermissionWidget%22%2C%22LockEquip%22%2C%22EditRunStrategy%22%2C%22DeleteEntityAdmin%22%2C%22DeleteProject%22%2C%22DeleteMenu%22%2C%22UpdateSerialNum%22%2C%22EditMember%22%2C%22DeleteEquip%22%2C%22SplitParamsConfigParams%22%2C%22UndoEquipGroup%22%2C%22DeleteWidget%22%2C%22SystemConfig%22%2C%22UpdateEquipMaintenance%22%2C%22CombineEquipGroup%22%2C%22EquipList%22%2C%22CompareParams%22%2C%22AlarmType%22%2C%22ProjectManage%22%2C%22ModelConfigParams%22%2C%22SaveEquipTemplate%22%2C%22ConfigDirectiveType%22%2C%22DeleteDataItem%22%2C%22ViewAllTemplateAttr%22%2C%22ExportAlarmReport%22%2C%22EnergyAssess%22%2C%22ProjectList%22%2C%22EnergySmartSwitch%22%2C%22DeleteCustomerRole%22%2C%22ToggleUser%22%2C%22SaveEquipTypeParams%22%2C%22UserManage%22%2C%22RunStrategy%22%2C%22EnableStrategyPlan%22%2C%22SaveAlarmRules%22%2C%22EquipGroupConfig%22%2C%22MultiSupreRemoteControl%22%2C%22UngroupedProject%22%2C%22SaveTag%22%2C%22CreateEnergyAssess%22%2C%22ElecConfig%22%2C%22DeleteAlarmRule%22%2C%22DeleteNoticeRule%22%2C%22RoleManage%22%2C%22EnergyAssessDetail%22%2C%22SaveEquip%22%2C%22DeleteDirectiveType%22%2C%22SaveAlarmType%22%2C%22ViewEquipLedger%22%2C%22NotStorageTransfer%22%2C%22DeleteEquipMaintenance%22%2C%22ConfigMenuPermission%22%2C%22IndustryManage%22%2C%22SaveCustomerRole%22%2C%22ProjectGroup%22%2C%22CreateRunStrategy%22%2C%22SaveEntity%22%2C%22SaveEnergyPlan%22%2C%22ViewNYProject%22%2C%22AlarmRule%22%2C%22DeleteRunStrategy%22%2C%22SaveEntityAdmin%22%2C%22EquipUpgrade%22%2C%22DeleteCustomerMember%22%2C%22SaveWidget%22%2C%22ConfigDirectivePermission%22%2C%22UnlockEquip%22%2C%22ConfigStatusParams%22%2C%22EquipRelateArea%22%2C%22GatewayList%22%2C%22SaveProject%22%2C%22AreaConfig%22%2C%22ToggleEquip%22%2C%22RelateProject%22%2C%22SaveNoticeRule%22%2C%22ExportEquip%22%2C%22ExportEnergyRunRecord%22%2C%22SaveGateway%22%2C%22DeleteAlarmType%22%2C%22Common%22%2C%22DeleteEquipType%22%2C%22ViewEquipMaintenance%22%2C%22DeleteIndustry%22%2C%22SystemService%22%2C%22MonitorConfig%22%2C%22ResetPassword%22%2C%22DeleteProgram%22%2C%22SaveEquipModel%22%2C%22EquipUpgradeLog%22%2C%22DeleteEntity%22%2C%22EquipmentMaintenance%22%2C%22EquipTemplate%22%2C%22SaveEquipType%22%2C%22SaveCustomerRolePermission%22%2C%22SaveMenu%22%2C%22MemberManage%22%2C%22ImportEquipTemplate%22%2C%22DeleteProjectGroup%22%2C%22SaveTagGroup%22%2C%22CustomerAuthManage%22%2C%22ConfigProjectTag%22%2C%22ManageGateway%22%2C%22EnergyStation%22%2C%22DeleteGateway%22%2C%22SaveDataItemConfig%22%2C%22AIDisableDateConfig%22%2C%22SaveRole%22%2C%22EquipType%22%2C%22ImportGateway%22%2C%22EquipUpload%22%2C%22DeleteEquipTemplate%22%2C%22CreateEquipTemplateBackup%22%2C%22EquipmentLedger%22%2C%22ConfigSplitEquip%22%2C%22RollbackTemplate%22%2C%22CreateNewStrategyPlan%22%2C%22PermissionManage%22%2C%22SaveProjectGroup%22%2C%22TransferPermission%22%2C%22EquipService%22%2C%22SaveSystem%22%2C%22EditEquipLedger%22%2C%22SaveDirectiveType%22%2C%22EquipBindSystem%22%2C%22EnableRunStrategy%22%2C%22ProgramConfig%22%2C%22CCTV%22%2C%22DeleteTagGroup%22%5D%2C%22entityId%22%3A10001%2C%22entityName%22%3A%22EK-Admin%EF%BC%88%E8%BF%90%E8%90%A5%E4%B8%93%E7%94%A8%EF%BC%89%22%2C%22entityLogo%22%3A%22%22%2C%22type%22%3A3%2C%22projectGroupingIds%22%3A%5B%5D%2C%22commandGroupIds%22%3A%5B229599061540865%2C229599076220929%2C229599086706689%2C233937838342145%2C399594794057729%5D%2C%22roles%22%3A%5B%22%E8%B6%85%E7%BA%A7%E7%AE%A1%E7%90%86%E5%91%98%22%5D%2C%22expirationTime%22%3A4102415999000%7D",
+            "schema": {
+              "type": "string",
+              "default": "%7B%22userId%22%3A1%2C%22mobile%22%3A%22ek-admin%22%2C%22username%22%3A%22admin%22%2C%22grantedAuthority%22%3A%5B%22EntityManage%22%2C%22DeleteTemplateBackup%22%2C%22ControllerConfig%22%2C%22SyncEquipBase%22%2C%22EquipMaintain%22%2C%22NoticeManage%22%2C%22HydraulicBalance%22%2C%22AlarmRecovery%22%2C%22EquipUnbindSystem%22%2C%22ConfigSplitParams%22%2C%22SuperAdmin%22%2C%22EquipModel%22%2C%22SplitEquipConfigParams%22%2C%22SaveIndustry%22%2C%22ReuseRunStrategy%22%2C%22RemoteControl%22%2C%22Special%22%2C%22EquipSelfTest%22%2C%22EquipAlias%22%2C%22DeleteRole%22%2C%22TransferRegion%22%2C%22AlarmList%22%2C%22EntityList%22%2C%22TagManage%22%2C%22ProjectService%22%2C%22EnergyPlanMode%22%2C%22EditCustomerMember%22%2C%22ExportEquipTemplate%22%2C%22DeleteMember%22%2C%22GatewayExchange%22%2C%22ProjectConfig%22%2C%22DeleteEquipModel%22%2C%22ConfigPermissionWidget%22%2C%22LockEquip%22%2C%22EditRunStrategy%22%2C%22DeleteEntityAdmin%22%2C%22DeleteProject%22%2C%22DeleteMenu%22%2C%22UpdateSerialNum%22%2C%22EditMember%22%2C%22DeleteEquip%22%2C%22SplitParamsConfigParams%22%2C%22UndoEquipGroup%22%2C%22DeleteWidget%22%2C%22SystemConfig%22%2C%22UpdateEquipMaintenance%22%2C%22CombineEquipGroup%22%2C%22EquipList%22%2C%22CompareParams%22%2C%22AlarmType%22%2C%22ProjectManage%22%2C%22ModelConfigParams%22%2C%22SaveEquipTemplate%22%2C%22ConfigDirectiveType%22%2C%22DeleteDataItem%22%2C%22ViewAllTemplateAttr%22%2C%22ExportAlarmReport%22%2C%22EnergyAssess%22%2C%22ProjectList%22%2C%22EnergySmartSwitch%22%2C%22DeleteCustomerRole%22%2C%22ToggleUser%22%2C%22SaveEquipTypeParams%22%2C%22UserManage%22%2C%22RunStrategy%22%2C%22EnableStrategyPlan%22%2C%22SaveAlarmRules%22%2C%22EquipGroupConfig%22%2C%22MultiSupreRemoteControl%22%2C%22UngroupedProject%22%2C%22SaveTag%22%2C%22CreateEnergyAssess%22%2C%22ElecConfig%22%2C%22DeleteAlarmRule%22%2C%22DeleteNoticeRule%22%2C%22RoleManage%22%2C%22EnergyAssessDetail%22%2C%22SaveEquip%22%2C%22DeleteDirectiveType%22%2C%22SaveAlarmType%22%2C%22ViewEquipLedger%22%2C%22NotStorageTransfer%22%2C%22DeleteEquipMaintenance%22%2C%22ConfigMenuPermission%22%2C%22IndustryManage%22%2C%22SaveCustomerRole%22%2C%22ProjectGroup%22%2C%22CreateRunStrategy%22%2C%22SaveEntity%22%2C%22SaveEnergyPlan%22%2C%22ViewNYProject%22%2C%22AlarmRule%22%2C%22DeleteRunStrategy%22%2C%22SaveEntityAdmin%22%2C%22EquipUpgrade%22%2C%22DeleteCustomerMember%22%2C%22SaveWidget%22%2C%22ConfigDirectivePermission%22%2C%22UnlockEquip%22%2C%22ConfigStatusParams%22%2C%22EquipRelateArea%22%2C%22GatewayList%22%2C%22SaveProject%22%2C%22AreaConfig%22%2C%22ToggleEquip%22%2C%22RelateProject%22%2C%22SaveNoticeRule%22%2C%22ExportEquip%22%2C%22ExportEnergyRunRecord%22%2C%22SaveGateway%22%2C%22DeleteAlarmType%22%2C%22Common%22%2C%22DeleteEquipType%22%2C%22ViewEquipMaintenance%22%2C%22DeleteIndustry%22%2C%22SystemService%22%2C%22MonitorConfig%22%2C%22ResetPassword%22%2C%22DeleteProgram%22%2C%22SaveEquipModel%22%2C%22EquipUpgradeLog%22%2C%22DeleteEntity%22%2C%22EquipmentMaintenance%22%2C%22EquipTemplate%22%2C%22SaveEquipType%22%2C%22SaveCustomerRolePermission%22%2C%22SaveMenu%22%2C%22MemberManage%22%2C%22ImportEquipTemplate%22%2C%22DeleteProjectGroup%22%2C%22SaveTagGroup%22%2C%22CustomerAuthManage%22%2C%22ConfigProjectTag%22%2C%22ManageGateway%22%2C%22EnergyStation%22%2C%22DeleteGateway%22%2C%22SaveDataItemConfig%22%2C%22AIDisableDateConfig%22%2C%22SaveRole%22%2C%22EquipType%22%2C%22ImportGateway%22%2C%22EquipUpload%22%2C%22DeleteEquipTemplate%22%2C%22CreateEquipTemplateBackup%22%2C%22EquipmentLedger%22%2C%22ConfigSplitEquip%22%2C%22RollbackTemplate%22%2C%22CreateNewStrategyPlan%22%2C%22PermissionManage%22%2C%22SaveProjectGroup%22%2C%22TransferPermission%22%2C%22EquipService%22%2C%22SaveSystem%22%2C%22EditEquipLedger%22%2C%22SaveDirectiveType%22%2C%22EquipBindSystem%22%2C%22EnableRunStrategy%22%2C%22ProgramConfig%22%2C%22CCTV%22%2C%22DeleteTagGroup%22%5D%2C%22entityId%22%3A10001%2C%22entityName%22%3A%22EK-Admin%EF%BC%88%E8%BF%90%E8%90%A5%E4%B8%93%E7%94%A8%EF%BC%89%22%2C%22entityLogo%22%3A%22%22%2C%22type%22%3A3%2C%22projectGroupingIds%22%3A%5B%5D%2C%22commandGroupIds%22%3A%5B229599061540865%2C229599076220929%2C229599086706689%2C233937838342145%2C399594794057729%5D%2C%22roles%22%3A%5B%22%E8%B6%85%E7%BA%A7%E7%AE%A1%E7%90%86%E5%91%98%22%5D%2C%22expirationTime%22%3A4102415999000%7D"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UniversalFold",
+                    "description": "com.ek.cloud.universal.UniversalFold"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/option/equipment/simple": {
+      "get": {
+        "summary": "设备-下拉框(简易数据)",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "description": "项目ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "businessGroupingId",
+            "in": "query",
+            "description": "业务系统",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "onlyUnassociated",
+            "in": "query",
+            "description": "是否仅返回未关联业务系统设备(1-是, 当传递businessGroupingId时不生效",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "virtual",
+            "in": "query",
+            "description": "是否展示虚拟设备(1-是)",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "equipmentTypeId",
+            "in": "query",
+            "description": "设备类型(返回当前类型以及所有子类型的设备)",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "equipmentTypeIds",
+            "in": "query",
+            "description": "设备类型(多个逗号分隔)",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "equipmentModeId",
+            "in": "query",
+            "description": "设备型号",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "equipmentTemplateId",
+            "in": "query",
+            "description": "设备模板",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "filterMount",
+            "in": "query",
+            "description": "是否过滤被挂载的设备(1-是)",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "buildingId",
+            "in": "query",
+            "description": "楼宇ID",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "alias",
+            "in": "query",
+            "description": "设备别名",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-header",
+            "in": "header",
+            "description": "",
+            "example": "%7B%22userId%22%3A1%2C%22mobile%22%3A%22ek-admin%22%2C%22username%22%3A%22admin%22%2C%22grantedAuthority%22%3A%5B%22EntityManage%22%2C%22DeleteTemplateBackup%22%2C%22ControllerConfig%22%2C%22SyncEquipBase%22%2C%22EquipMaintain%22%2C%22NoticeManage%22%2C%22HydraulicBalance%22%2C%22AlarmRecovery%22%2C%22EquipUnbindSystem%22%2C%22ConfigSplitParams%22%2C%22SuperAdmin%22%2C%22EquipModel%22%2C%22SplitEquipConfigParams%22%2C%22SaveIndustry%22%2C%22ReuseRunStrategy%22%2C%22RemoteControl%22%2C%22Special%22%2C%22EquipSelfTest%22%2C%22EquipAlias%22%2C%22DeleteRole%22%2C%22TransferRegion%22%2C%22AlarmList%22%2C%22EntityList%22%2C%22TagManage%22%2C%22ProjectService%22%2C%22EnergyPlanMode%22%2C%22EditCustomerMember%22%2C%22ExportEquipTemplate%22%2C%22DeleteMember%22%2C%22GatewayExchange%22%2C%22ProjectConfig%22%2C%22DeleteEquipModel%22%2C%22ConfigPermissionWidget%22%2C%22LockEquip%22%2C%22EditRunStrategy%22%2C%22DeleteEntityAdmin%22%2C%22DeleteProject%22%2C%22DeleteMenu%22%2C%22UpdateSerialNum%22%2C%22EditMember%22%2C%22DeleteEquip%22%2C%22SplitParamsConfigParams%22%2C%22UndoEquipGroup%22%2C%22DeleteWidget%22%2C%22SystemConfig%22%2C%22UpdateEquipMaintenance%22%2C%22CombineEquipGroup%22%2C%22EquipList%22%2C%22CompareParams%22%2C%22AlarmType%22%2C%22ProjectManage%22%2C%22ModelConfigParams%22%2C%22SaveEquipTemplate%22%2C%22ConfigDirectiveType%22%2C%22DeleteDataItem%22%2C%22ViewAllTemplateAttr%22%2C%22ExportAlarmReport%22%2C%22EnergyAssess%22%2C%22ProjectList%22%2C%22EnergySmartSwitch%22%2C%22DeleteCustomerRole%22%2C%22ToggleUser%22%2C%22SaveEquipTypeParams%22%2C%22UserManage%22%2C%22RunStrategy%22%2C%22EnableStrategyPlan%22%2C%22SaveAlarmRules%22%2C%22EquipGroupConfig%22%2C%22MultiSupreRemoteControl%22%2C%22UngroupedProject%22%2C%22SaveTag%22%2C%22CreateEnergyAssess%22%2C%22ElecConfig%22%2C%22DeleteAlarmRule%22%2C%22DeleteNoticeRule%22%2C%22RoleManage%22%2C%22EnergyAssessDetail%22%2C%22SaveEquip%22%2C%22DeleteDirectiveType%22%2C%22SaveAlarmType%22%2C%22ViewEquipLedger%22%2C%22NotStorageTransfer%22%2C%22DeleteEquipMaintenance%22%2C%22ConfigMenuPermission%22%2C%22IndustryManage%22%2C%22SaveCustomerRole%22%2C%22ProjectGroup%22%2C%22CreateRunStrategy%22%2C%22SaveEntity%22%2C%22SaveEnergyPlan%22%2C%22ViewNYProject%22%2C%22AlarmRule%22%2C%22DeleteRunStrategy%22%2C%22SaveEntityAdmin%22%2C%22EquipUpgrade%22%2C%22DeleteCustomerMember%22%2C%22SaveWidget%22%2C%22ConfigDirectivePermission%22%2C%22UnlockEquip%22%2C%22ConfigStatusParams%22%2C%22EquipRelateArea%22%2C%22GatewayList%22%2C%22SaveProject%22%2C%22AreaConfig%22%2C%22ToggleEquip%22%2C%22RelateProject%22%2C%22SaveNoticeRule%22%2C%22ExportEquip%22%2C%22ExportEnergyRunRecord%22%2C%22SaveGateway%22%2C%22DeleteAlarmType%22%2C%22Common%22%2C%22DeleteEquipType%22%2C%22ViewEquipMaintenance%22%2C%22DeleteIndustry%22%2C%22SystemService%22%2C%22MonitorConfig%22%2C%22ResetPassword%22%2C%22DeleteProgram%22%2C%22SaveEquipModel%22%2C%22EquipUpgradeLog%22%2C%22DeleteEntity%22%2C%22EquipmentMaintenance%22%2C%22EquipTemplate%22%2C%22SaveEquipType%22%2C%22SaveCustomerRolePermission%22%2C%22SaveMenu%22%2C%22MemberManage%22%2C%22ImportEquipTemplate%22%2C%22DeleteProjectGroup%22%2C%22SaveTagGroup%22%2C%22CustomerAuthManage%22%2C%22ConfigProjectTag%22%2C%22ManageGateway%22%2C%22EnergyStation%22%2C%22DeleteGateway%22%2C%22SaveDataItemConfig%22%2C%22AIDisableDateConfig%22%2C%22SaveRole%22%2C%22EquipType%22%2C%22ImportGateway%22%2C%22EquipUpload%22%2C%22DeleteEquipTemplate%22%2C%22CreateEquipTemplateBackup%22%2C%22EquipmentLedger%22%2C%22ConfigSplitEquip%22%2C%22RollbackTemplate%22%2C%22CreateNewStrategyPlan%22%2C%22PermissionManage%22%2C%22SaveProjectGroup%22%2C%22TransferPermission%22%2C%22EquipService%22%2C%22SaveSystem%22%2C%22EditEquipLedger%22%2C%22SaveDirectiveType%22%2C%22EquipBindSystem%22%2C%22EnableRunStrategy%22%2C%22ProgramConfig%22%2C%22CCTV%22%2C%22DeleteTagGroup%22%5D%2C%22entityId%22%3A10001%2C%22entityName%22%3A%22EK-Admin%EF%BC%88%E8%BF%90%E8%90%A5%E4%B8%93%E7%94%A8%EF%BC%89%22%2C%22entityLogo%22%3A%22%22%2C%22type%22%3A3%2C%22projectGroupingIds%22%3A%5B%5D%2C%22commandGroupIds%22%3A%5B229599061540865%2C229599076220929%2C229599086706689%2C233937838342145%2C399594794057729%5D%2C%22roles%22%3A%5B%22%E8%B6%85%E7%BA%A7%E7%AE%A1%E7%90%86%E5%91%98%22%5D%2C%22expirationTime%22%3A4102415999000%7D",
+            "schema": {
+              "type": "string",
+              "default": "%7B%22userId%22%3A1%2C%22mobile%22%3A%22ek-admin%22%2C%22username%22%3A%22admin%22%2C%22grantedAuthority%22%3A%5B%22EntityManage%22%2C%22DeleteTemplateBackup%22%2C%22ControllerConfig%22%2C%22SyncEquipBase%22%2C%22EquipMaintain%22%2C%22NoticeManage%22%2C%22HydraulicBalance%22%2C%22AlarmRecovery%22%2C%22EquipUnbindSystem%22%2C%22ConfigSplitParams%22%2C%22SuperAdmin%22%2C%22EquipModel%22%2C%22SplitEquipConfigParams%22%2C%22SaveIndustry%22%2C%22ReuseRunStrategy%22%2C%22RemoteControl%22%2C%22Special%22%2C%22EquipSelfTest%22%2C%22EquipAlias%22%2C%22DeleteRole%22%2C%22TransferRegion%22%2C%22AlarmList%22%2C%22EntityList%22%2C%22TagManage%22%2C%22ProjectService%22%2C%22EnergyPlanMode%22%2C%22EditCustomerMember%22%2C%22ExportEquipTemplate%22%2C%22DeleteMember%22%2C%22GatewayExchange%22%2C%22ProjectConfig%22%2C%22DeleteEquipModel%22%2C%22ConfigPermissionWidget%22%2C%22LockEquip%22%2C%22EditRunStrategy%22%2C%22DeleteEntityAdmin%22%2C%22DeleteProject%22%2C%22DeleteMenu%22%2C%22UpdateSerialNum%22%2C%22EditMember%22%2C%22DeleteEquip%22%2C%22SplitParamsConfigParams%22%2C%22UndoEquipGroup%22%2C%22DeleteWidget%22%2C%22SystemConfig%22%2C%22UpdateEquipMaintenance%22%2C%22CombineEquipGroup%22%2C%22EquipList%22%2C%22CompareParams%22%2C%22AlarmType%22%2C%22ProjectManage%22%2C%22ModelConfigParams%22%2C%22SaveEquipTemplate%22%2C%22ConfigDirectiveType%22%2C%22DeleteDataItem%22%2C%22ViewAllTemplateAttr%22%2C%22ExportAlarmReport%22%2C%22EnergyAssess%22%2C%22ProjectList%22%2C%22EnergySmartSwitch%22%2C%22DeleteCustomerRole%22%2C%22ToggleUser%22%2C%22SaveEquipTypeParams%22%2C%22UserManage%22%2C%22RunStrategy%22%2C%22EnableStrategyPlan%22%2C%22SaveAlarmRules%22%2C%22EquipGroupConfig%22%2C%22MultiSupreRemoteControl%22%2C%22UngroupedProject%22%2C%22SaveTag%22%2C%22CreateEnergyAssess%22%2C%22ElecConfig%22%2C%22DeleteAlarmRule%22%2C%22DeleteNoticeRule%22%2C%22RoleManage%22%2C%22EnergyAssessDetail%22%2C%22SaveEquip%22%2C%22DeleteDirectiveType%22%2C%22SaveAlarmType%22%2C%22ViewEquipLedger%22%2C%22NotStorageTransfer%22%2C%22DeleteEquipMaintenance%22%2C%22ConfigMenuPermission%22%2C%22IndustryManage%22%2C%22SaveCustomerRole%22%2C%22ProjectGroup%22%2C%22CreateRunStrategy%22%2C%22SaveEntity%22%2C%22SaveEnergyPlan%22%2C%22ViewNYProject%22%2C%22AlarmRule%22%2C%22DeleteRunStrategy%22%2C%22SaveEntityAdmin%22%2C%22EquipUpgrade%22%2C%22DeleteCustomerMember%22%2C%22SaveWidget%22%2C%22ConfigDirectivePermission%22%2C%22UnlockEquip%22%2C%22ConfigStatusParams%22%2C%22EquipRelateArea%22%2C%22GatewayList%22%2C%22SaveProject%22%2C%22AreaConfig%22%2C%22ToggleEquip%22%2C%22RelateProject%22%2C%22SaveNoticeRule%22%2C%22ExportEquip%22%2C%22ExportEnergyRunRecord%22%2C%22SaveGateway%22%2C%22DeleteAlarmType%22%2C%22Common%22%2C%22DeleteEquipType%22%2C%22ViewEquipMaintenance%22%2C%22DeleteIndustry%22%2C%22SystemService%22%2C%22MonitorConfig%22%2C%22ResetPassword%22%2C%22DeleteProgram%22%2C%22SaveEquipModel%22%2C%22EquipUpgradeLog%22%2C%22DeleteEntity%22%2C%22EquipmentMaintenance%22%2C%22EquipTemplate%22%2C%22SaveEquipType%22%2C%22SaveCustomerRolePermission%22%2C%22SaveMenu%22%2C%22MemberManage%22%2C%22ImportEquipTemplate%22%2C%22DeleteProjectGroup%22%2C%22SaveTagGroup%22%2C%22CustomerAuthManage%22%2C%22ConfigProjectTag%22%2C%22ManageGateway%22%2C%22EnergyStation%22%2C%22DeleteGateway%22%2C%22SaveDataItemConfig%22%2C%22AIDisableDateConfig%22%2C%22SaveRole%22%2C%22EquipType%22%2C%22ImportGateway%22%2C%22EquipUpload%22%2C%22DeleteEquipTemplate%22%2C%22CreateEquipTemplateBackup%22%2C%22EquipmentLedger%22%2C%22ConfigSplitEquip%22%2C%22RollbackTemplate%22%2C%22CreateNewStrategyPlan%22%2C%22PermissionManage%22%2C%22SaveProjectGroup%22%2C%22TransferPermission%22%2C%22EquipService%22%2C%22SaveSystem%22%2C%22EditEquipLedger%22%2C%22SaveDirectiveType%22%2C%22EquipBindSystem%22%2C%22EnableRunStrategy%22%2C%22ProgramConfig%22%2C%22CCTV%22%2C%22DeleteTagGroup%22%5D%2C%22entityId%22%3A10001%2C%22entityName%22%3A%22EK-Admin%EF%BC%88%E8%BF%90%E8%90%A5%E4%B8%93%E7%94%A8%EF%BC%89%22%2C%22entityLogo%22%3A%22%22%2C%22type%22%3A3%2C%22projectGroupingIds%22%3A%5B%5D%2C%22commandGroupIds%22%3A%5B229599061540865%2C229599076220929%2C229599086706689%2C233937838342145%2C399594794057729%5D%2C%22roles%22%3A%5B%22%E8%B6%85%E7%BA%A7%E7%AE%A1%E7%90%86%E5%91%98%22%5D%2C%22expirationTime%22%3A4102415999000%7D"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EquipmentSingleResp",
+                    "description": "com.ek.cloud.bus.web.vo.resp.EquipmentResp.EquipmentSingleResp"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/equipment/get": {
+      "get": {
+        "summary": "设备-主键查询",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "设备",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "x-user-header",
+            "in": "header",
+            "description": "",
+            "example": "%7B%22userId%22%3A1%2C%22mobile%22%3A%22ek-admin%22%2C%22username%22%3A%22admin%22%2C%22grantedAuthority%22%3A%5B%22EntityManage%22%2C%22DeleteTemplateBackup%22%2C%22ControllerConfig%22%2C%22SyncEquipBase%22%2C%22EquipMaintain%22%2C%22NoticeManage%22%2C%22HydraulicBalance%22%2C%22AlarmRecovery%22%2C%22EquipUnbindSystem%22%2C%22ConfigSplitParams%22%2C%22SuperAdmin%22%2C%22EquipModel%22%2C%22SplitEquipConfigParams%22%2C%22SaveIndustry%22%2C%22ReuseRunStrategy%22%2C%22RemoteControl%22%2C%22Special%22%2C%22EquipSelfTest%22%2C%22EquipAlias%22%2C%22DeleteRole%22%2C%22TransferRegion%22%2C%22AlarmList%22%2C%22EntityList%22%2C%22TagManage%22%2C%22ProjectService%22%2C%22EnergyPlanMode%22%2C%22EditCustomerMember%22%2C%22ExportEquipTemplate%22%2C%22DeleteMember%22%2C%22GatewayExchange%22%2C%22ProjectConfig%22%2C%22DeleteEquipModel%22%2C%22ConfigPermissionWidget%22%2C%22LockEquip%22%2C%22EditRunStrategy%22%2C%22DeleteEntityAdmin%22%2C%22DeleteProject%22%2C%22DeleteMenu%22%2C%22UpdateSerialNum%22%2C%22EditMember%22%2C%22DeleteEquip%22%2C%22SplitParamsConfigParams%22%2C%22UndoEquipGroup%22%2C%22DeleteWidget%22%2C%22SystemConfig%22%2C%22UpdateEquipMaintenance%22%2C%22CombineEquipGroup%22%2C%22EquipList%22%2C%22CompareParams%22%2C%22AlarmType%22%2C%22ProjectManage%22%2C%22ModelConfigParams%22%2C%22SaveEquipTemplate%22%2C%22ConfigDirectiveType%22%2C%22DeleteDataItem%22%2C%22ViewAllTemplateAttr%22%2C%22ExportAlarmReport%22%2C%22EnergyAssess%22%2C%22ProjectList%22%2C%22EnergySmartSwitch%22%2C%22DeleteCustomerRole%22%2C%22ToggleUser%22%2C%22SaveEquipTypeParams%22%2C%22UserManage%22%2C%22RunStrategy%22%2C%22EnableStrategyPlan%22%2C%22SaveAlarmRules%22%2C%22EquipGroupConfig%22%2C%22MultiSupreRemoteControl%22%2C%22UngroupedProject%22%2C%22SaveTag%22%2C%22CreateEnergyAssess%22%2C%22ElecConfig%22%2C%22DeleteAlarmRule%22%2C%22DeleteNoticeRule%22%2C%22RoleManage%22%2C%22EnergyAssessDetail%22%2C%22SaveEquip%22%2C%22DeleteDirectiveType%22%2C%22SaveAlarmType%22%2C%22ViewEquipLedger%22%2C%22NotStorageTransfer%22%2C%22DeleteEquipMaintenance%22%2C%22ConfigMenuPermission%22%2C%22IndustryManage%22%2C%22SaveCustomerRole%22%2C%22ProjectGroup%22%2C%22CreateRunStrategy%22%2C%22SaveEntity%22%2C%22SaveEnergyPlan%22%2C%22ViewNYProject%22%2C%22AlarmRule%22%2C%22DeleteRunStrategy%22%2C%22SaveEntityAdmin%22%2C%22EquipUpgrade%22%2C%22DeleteCustomerMember%22%2C%22SaveWidget%22%2C%22ConfigDirectivePermission%22%2C%22UnlockEquip%22%2C%22ConfigStatusParams%22%2C%22EquipRelateArea%22%2C%22GatewayList%22%2C%22SaveProject%22%2C%22AreaConfig%22%2C%22ToggleEquip%22%2C%22RelateProject%22%2C%22SaveNoticeRule%22%2C%22ExportEquip%22%2C%22ExportEnergyRunRecord%22%2C%22SaveGateway%22%2C%22DeleteAlarmType%22%2C%22Common%22%2C%22DeleteEquipType%22%2C%22ViewEquipMaintenance%22%2C%22DeleteIndustry%22%2C%22SystemService%22%2C%22MonitorConfig%22%2C%22ResetPassword%22%2C%22DeleteProgram%22%2C%22SaveEquipModel%22%2C%22EquipUpgradeLog%22%2C%22DeleteEntity%22%2C%22EquipmentMaintenance%22%2C%22EquipTemplate%22%2C%22SaveEquipType%22%2C%22SaveCustomerRolePermission%22%2C%22SaveMenu%22%2C%22MemberManage%22%2C%22ImportEquipTemplate%22%2C%22DeleteProjectGroup%22%2C%22SaveTagGroup%22%2C%22CustomerAuthManage%22%2C%22ConfigProjectTag%22%2C%22ManageGateway%22%2C%22EnergyStation%22%2C%22DeleteGateway%22%2C%22SaveDataItemConfig%22%2C%22AIDisableDateConfig%22%2C%22SaveRole%22%2C%22EquipType%22%2C%22ImportGateway%22%2C%22EquipUpload%22%2C%22DeleteEquipTemplate%22%2C%22CreateEquipTemplateBackup%22%2C%22EquipmentLedger%22%2C%22ConfigSplitEquip%22%2C%22RollbackTemplate%22%2C%22CreateNewStrategyPlan%22%2C%22PermissionManage%22%2C%22SaveProjectGroup%22%2C%22TransferPermission%22%2C%22EquipService%22%2C%22SaveSystem%22%2C%22EditEquipLedger%22%2C%22SaveDirectiveType%22%2C%22EquipBindSystem%22%2C%22EnableRunStrategy%22%2C%22ProgramConfig%22%2C%22CCTV%22%2C%22DeleteTagGroup%22%5D%2C%22entityId%22%3A10001%2C%22entityName%22%3A%22EK-Admin%EF%BC%88%E8%BF%90%E8%90%A5%E4%B8%93%E7%94%A8%EF%BC%89%22%2C%22entityLogo%22%3A%22%22%2C%22type%22%3A3%2C%22projectGroupingIds%22%3A%5B%5D%2C%22commandGroupIds%22%3A%5B229599061540865%2C229599076220929%2C229599086706689%2C233937838342145%2C399594794057729%5D%2C%22roles%22%3A%5B%22%E8%B6%85%E7%BA%A7%E7%AE%A1%E7%90%86%E5%91%98%22%5D%2C%22expirationTime%22%3A4102415999000%7D",
+            "schema": {
+              "type": "string",
+              "default": "%7B%22userId%22%3A1%2C%22mobile%22%3A%22ek-admin%22%2C%22username%22%3A%22admin%22%2C%22grantedAuthority%22%3A%5B%22EntityManage%22%2C%22DeleteTemplateBackup%22%2C%22ControllerConfig%22%2C%22SyncEquipBase%22%2C%22EquipMaintain%22%2C%22NoticeManage%22%2C%22HydraulicBalance%22%2C%22AlarmRecovery%22%2C%22EquipUnbindSystem%22%2C%22ConfigSplitParams%22%2C%22SuperAdmin%22%2C%22EquipModel%22%2C%22SplitEquipConfigParams%22%2C%22SaveIndustry%22%2C%22ReuseRunStrategy%22%2C%22RemoteControl%22%2C%22Special%22%2C%22EquipSelfTest%22%2C%22EquipAlias%22%2C%22DeleteRole%22%2C%22TransferRegion%22%2C%22AlarmList%22%2C%22EntityList%22%2C%22TagManage%22%2C%22ProjectService%22%2C%22EnergyPlanMode%22%2C%22EditCustomerMember%22%2C%22ExportEquipTemplate%22%2C%22DeleteMember%22%2C%22GatewayExchange%22%2C%22ProjectConfig%22%2C%22DeleteEquipModel%22%2C%22ConfigPermissionWidget%22%2C%22LockEquip%22%2C%22EditRunStrategy%22%2C%22DeleteEntityAdmin%22%2C%22DeleteProject%22%2C%22DeleteMenu%22%2C%22UpdateSerialNum%22%2C%22EditMember%22%2C%22DeleteEquip%22%2C%22SplitParamsConfigParams%22%2C%22UndoEquipGroup%22%2C%22DeleteWidget%22%2C%22SystemConfig%22%2C%22UpdateEquipMaintenance%22%2C%22CombineEquipGroup%22%2C%22EquipList%22%2C%22CompareParams%22%2C%22AlarmType%22%2C%22ProjectManage%22%2C%22ModelConfigParams%22%2C%22SaveEquipTemplate%22%2C%22ConfigDirectiveType%22%2C%22DeleteDataItem%22%2C%22ViewAllTemplateAttr%22%2C%22ExportAlarmReport%22%2C%22EnergyAssess%22%2C%22ProjectList%22%2C%22EnergySmartSwitch%22%2C%22DeleteCustomerRole%22%2C%22ToggleUser%22%2C%22SaveEquipTypeParams%22%2C%22UserManage%22%2C%22RunStrategy%22%2C%22EnableStrategyPlan%22%2C%22SaveAlarmRules%22%2C%22EquipGroupConfig%22%2C%22MultiSupreRemoteControl%22%2C%22UngroupedProject%22%2C%22SaveTag%22%2C%22CreateEnergyAssess%22%2C%22ElecConfig%22%2C%22DeleteAlarmRule%22%2C%22DeleteNoticeRule%22%2C%22RoleManage%22%2C%22EnergyAssessDetail%22%2C%22SaveEquip%22%2C%22DeleteDirectiveType%22%2C%22SaveAlarmType%22%2C%22ViewEquipLedger%22%2C%22NotStorageTransfer%22%2C%22DeleteEquipMaintenance%22%2C%22ConfigMenuPermission%22%2C%22IndustryManage%22%2C%22SaveCustomerRole%22%2C%22ProjectGroup%22%2C%22CreateRunStrategy%22%2C%22SaveEntity%22%2C%22SaveEnergyPlan%22%2C%22ViewNYProject%22%2C%22AlarmRule%22%2C%22DeleteRunStrategy%22%2C%22SaveEntityAdmin%22%2C%22EquipUpgrade%22%2C%22DeleteCustomerMember%22%2C%22SaveWidget%22%2C%22ConfigDirectivePermission%22%2C%22UnlockEquip%22%2C%22ConfigStatusParams%22%2C%22EquipRelateArea%22%2C%22GatewayList%22%2C%22SaveProject%22%2C%22AreaConfig%22%2C%22ToggleEquip%22%2C%22RelateProject%22%2C%22SaveNoticeRule%22%2C%22ExportEquip%22%2C%22ExportEnergyRunRecord%22%2C%22SaveGateway%22%2C%22DeleteAlarmType%22%2C%22Common%22%2C%22DeleteEquipType%22%2C%22ViewEquipMaintenance%22%2C%22DeleteIndustry%22%2C%22SystemService%22%2C%22MonitorConfig%22%2C%22ResetPassword%22%2C%22DeleteProgram%22%2C%22SaveEquipModel%22%2C%22EquipUpgradeLog%22%2C%22DeleteEntity%22%2C%22EquipmentMaintenance%22%2C%22EquipTemplate%22%2C%22SaveEquipType%22%2C%22SaveCustomerRolePermission%22%2C%22SaveMenu%22%2C%22MemberManage%22%2C%22ImportEquipTemplate%22%2C%22DeleteProjectGroup%22%2C%22SaveTagGroup%22%2C%22CustomerAuthManage%22%2C%22ConfigProjectTag%22%2C%22ManageGateway%22%2C%22EnergyStation%22%2C%22DeleteGateway%22%2C%22SaveDataItemConfig%22%2C%22AIDisableDateConfig%22%2C%22SaveRole%22%2C%22EquipType%22%2C%22ImportGateway%22%2C%22EquipUpload%22%2C%22DeleteEquipTemplate%22%2C%22CreateEquipTemplateBackup%22%2C%22EquipmentLedger%22%2C%22ConfigSplitEquip%22%2C%22RollbackTemplate%22%2C%22CreateNewStrategyPlan%22%2C%22PermissionManage%22%2C%22SaveProjectGroup%22%2C%22TransferPermission%22%2C%22EquipService%22%2C%22SaveSystem%22%2C%22EditEquipLedger%22%2C%22SaveDirectiveType%22%2C%22EquipBindSystem%22%2C%22EnableRunStrategy%22%2C%22ProgramConfig%22%2C%22CCTV%22%2C%22DeleteTagGroup%22%5D%2C%22entityId%22%3A10001%2C%22entityName%22%3A%22EK-Admin%EF%BC%88%E8%BF%90%E8%90%A5%E4%B8%93%E7%94%A8%EF%BC%89%22%2C%22entityLogo%22%3A%22%22%2C%22type%22%3A3%2C%22projectGroupingIds%22%3A%5B%5D%2C%22commandGroupIds%22%3A%5B229599061540865%2C229599076220929%2C229599086706689%2C233937838342145%2C399594794057729%5D%2C%22roles%22%3A%5B%22%E8%B6%85%E7%BA%A7%E7%AE%A1%E7%90%86%E5%91%98%22%5D%2C%22expirationTime%22%3A4102415999000%7D"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipmentResp",
+                  "description": ""
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/pivotal/param/get": {
+      "get": {
+        "summary": "获取单设备关键参数以及值",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "equipmentId",
+            "in": "query",
+            "description": "设备ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "x-user-header",
+            "in": "header",
+            "description": "",
+            "example": "%7B%22userId%22%3A1%2C%22mobile%22%3A%22ek-admin%22%2C%22username%22%3A%22admin%22%2C%22grantedAuthority%22%3A%5B%22EntityManage%22%2C%22DeleteTemplateBackup%22%2C%22ControllerConfig%22%2C%22SyncEquipBase%22%2C%22EquipMaintain%22%2C%22NoticeManage%22%2C%22HydraulicBalance%22%2C%22AlarmRecovery%22%2C%22EquipUnbindSystem%22%2C%22ConfigSplitParams%22%2C%22SuperAdmin%22%2C%22EquipModel%22%2C%22SplitEquipConfigParams%22%2C%22SaveIndustry%22%2C%22ReuseRunStrategy%22%2C%22RemoteControl%22%2C%22Special%22%2C%22EquipSelfTest%22%2C%22EquipAlias%22%2C%22DeleteRole%22%2C%22TransferRegion%22%2C%22AlarmList%22%2C%22EntityList%22%2C%22TagManage%22%2C%22ProjectService%22%2C%22EnergyPlanMode%22%2C%22EditCustomerMember%22%2C%22ExportEquipTemplate%22%2C%22DeleteMember%22%2C%22GatewayExchange%22%2C%22ProjectConfig%22%2C%22DeleteEquipModel%22%2C%22ConfigPermissionWidget%22%2C%22LockEquip%22%2C%22EditRunStrategy%22%2C%22DeleteEntityAdmin%22%2C%22DeleteProject%22%2C%22DeleteMenu%22%2C%22UpdateSerialNum%22%2C%22EditMember%22%2C%22DeleteEquip%22%2C%22SplitParamsConfigParams%22%2C%22UndoEquipGroup%22%2C%22DeleteWidget%22%2C%22SystemConfig%22%2C%22UpdateEquipMaintenance%22%2C%22CombineEquipGroup%22%2C%22EquipList%22%2C%22CompareParams%22%2C%22AlarmType%22%2C%22ProjectManage%22%2C%22ModelConfigParams%22%2C%22SaveEquipTemplate%22%2C%22ConfigDirectiveType%22%2C%22DeleteDataItem%22%2C%22ViewAllTemplateAttr%22%2C%22ExportAlarmReport%22%2C%22EnergyAssess%22%2C%22ProjectList%22%2C%22EnergySmartSwitch%22%2C%22DeleteCustomerRole%22%2C%22ToggleUser%22%2C%22SaveEquipTypeParams%22%2C%22UserManage%22%2C%22RunStrategy%22%2C%22EnableStrategyPlan%22%2C%22SaveAlarmRules%22%2C%22EquipGroupConfig%22%2C%22MultiSupreRemoteControl%22%2C%22UngroupedProject%22%2C%22SaveTag%22%2C%22CreateEnergyAssess%22%2C%22ElecConfig%22%2C%22DeleteAlarmRule%22%2C%22DeleteNoticeRule%22%2C%22RoleManage%22%2C%22EnergyAssessDetail%22%2C%22SaveEquip%22%2C%22DeleteDirectiveType%22%2C%22SaveAlarmType%22%2C%22ViewEquipLedger%22%2C%22NotStorageTransfer%22%2C%22DeleteEquipMaintenance%22%2C%22ConfigMenuPermission%22%2C%22IndustryManage%22%2C%22SaveCustomerRole%22%2C%22ProjectGroup%22%2C%22CreateRunStrategy%22%2C%22SaveEntity%22%2C%22SaveEnergyPlan%22%2C%22ViewNYProject%22%2C%22AlarmRule%22%2C%22DeleteRunStrategy%22%2C%22SaveEntityAdmin%22%2C%22EquipUpgrade%22%2C%22DeleteCustomerMember%22%2C%22SaveWidget%22%2C%22ConfigDirectivePermission%22%2C%22UnlockEquip%22%2C%22ConfigStatusParams%22%2C%22EquipRelateArea%22%2C%22GatewayList%22%2C%22SaveProject%22%2C%22AreaConfig%22%2C%22ToggleEquip%22%2C%22RelateProject%22%2C%22SaveNoticeRule%22%2C%22ExportEquip%22%2C%22ExportEnergyRunRecord%22%2C%22SaveGateway%22%2C%22DeleteAlarmType%22%2C%22Common%22%2C%22DeleteEquipType%22%2C%22ViewEquipMaintenance%22%2C%22DeleteIndustry%22%2C%22SystemService%22%2C%22MonitorConfig%22%2C%22ResetPassword%22%2C%22DeleteProgram%22%2C%22SaveEquipModel%22%2C%22EquipUpgradeLog%22%2C%22DeleteEntity%22%2C%22EquipmentMaintenance%22%2C%22EquipTemplate%22%2C%22SaveEquipType%22%2C%22SaveCustomerRolePermission%22%2C%22SaveMenu%22%2C%22MemberManage%22%2C%22ImportEquipTemplate%22%2C%22DeleteProjectGroup%22%2C%22SaveTagGroup%22%2C%22CustomerAuthManage%22%2C%22ConfigProjectTag%22%2C%22ManageGateway%22%2C%22EnergyStation%22%2C%22DeleteGateway%22%2C%22SaveDataItemConfig%22%2C%22AIDisableDateConfig%22%2C%22SaveRole%22%2C%22EquipType%22%2C%22ImportGateway%22%2C%22EquipUpload%22%2C%22DeleteEquipTemplate%22%2C%22CreateEquipTemplateBackup%22%2C%22EquipmentLedger%22%2C%22ConfigSplitEquip%22%2C%22RollbackTemplate%22%2C%22CreateNewStrategyPlan%22%2C%22PermissionManage%22%2C%22SaveProjectGroup%22%2C%22TransferPermission%22%2C%22EquipService%22%2C%22SaveSystem%22%2C%22EditEquipLedger%22%2C%22SaveDirectiveType%22%2C%22EquipBindSystem%22%2C%22EnableRunStrategy%22%2C%22ProgramConfig%22%2C%22CCTV%22%2C%22DeleteTagGroup%22%5D%2C%22entityId%22%3A10001%2C%22entityName%22%3A%22EK-Admin%EF%BC%88%E8%BF%90%E8%90%A5%E4%B8%93%E7%94%A8%EF%BC%89%22%2C%22entityLogo%22%3A%22%22%2C%22type%22%3A3%2C%22projectGroupingIds%22%3A%5B%5D%2C%22commandGroupIds%22%3A%5B229599061540865%2C229599076220929%2C229599086706689%2C233937838342145%2C399594794057729%5D%2C%22roles%22%3A%5B%22%E8%B6%85%E7%BA%A7%E7%AE%A1%E7%90%86%E5%91%98%22%5D%2C%22expirationTime%22%3A4102415999000%7D",
+            "schema": {
+              "type": "string",
+              "default": "%7B%22userId%22%3A1%2C%22mobile%22%3A%22ek-admin%22%2C%22username%22%3A%22admin%22%2C%22grantedAuthority%22%3A%5B%22EntityManage%22%2C%22DeleteTemplateBackup%22%2C%22ControllerConfig%22%2C%22SyncEquipBase%22%2C%22EquipMaintain%22%2C%22NoticeManage%22%2C%22HydraulicBalance%22%2C%22AlarmRecovery%22%2C%22EquipUnbindSystem%22%2C%22ConfigSplitParams%22%2C%22SuperAdmin%22%2C%22EquipModel%22%2C%22SplitEquipConfigParams%22%2C%22SaveIndustry%22%2C%22ReuseRunStrategy%22%2C%22RemoteControl%22%2C%22Special%22%2C%22EquipSelfTest%22%2C%22EquipAlias%22%2C%22DeleteRole%22%2C%22TransferRegion%22%2C%22AlarmList%22%2C%22EntityList%22%2C%22TagManage%22%2C%22ProjectService%22%2C%22EnergyPlanMode%22%2C%22EditCustomerMember%22%2C%22ExportEquipTemplate%22%2C%22DeleteMember%22%2C%22GatewayExchange%22%2C%22ProjectConfig%22%2C%22DeleteEquipModel%22%2C%22ConfigPermissionWidget%22%2C%22LockEquip%22%2C%22EditRunStrategy%22%2C%22DeleteEntityAdmin%22%2C%22DeleteProject%22%2C%22DeleteMenu%22%2C%22UpdateSerialNum%22%2C%22EditMember%22%2C%22DeleteEquip%22%2C%22SplitParamsConfigParams%22%2C%22UndoEquipGroup%22%2C%22DeleteWidget%22%2C%22SystemConfig%22%2C%22UpdateEquipMaintenance%22%2C%22CombineEquipGroup%22%2C%22EquipList%22%2C%22CompareParams%22%2C%22AlarmType%22%2C%22ProjectManage%22%2C%22ModelConfigParams%22%2C%22SaveEquipTemplate%22%2C%22ConfigDirectiveType%22%2C%22DeleteDataItem%22%2C%22ViewAllTemplateAttr%22%2C%22ExportAlarmReport%22%2C%22EnergyAssess%22%2C%22ProjectList%22%2C%22EnergySmartSwitch%22%2C%22DeleteCustomerRole%22%2C%22ToggleUser%22%2C%22SaveEquipTypeParams%22%2C%22UserManage%22%2C%22RunStrategy%22%2C%22EnableStrategyPlan%22%2C%22SaveAlarmRules%22%2C%22EquipGroupConfig%22%2C%22MultiSupreRemoteControl%22%2C%22UngroupedProject%22%2C%22SaveTag%22%2C%22CreateEnergyAssess%22%2C%22ElecConfig%22%2C%22DeleteAlarmRule%22%2C%22DeleteNoticeRule%22%2C%22RoleManage%22%2C%22EnergyAssessDetail%22%2C%22SaveEquip%22%2C%22DeleteDirectiveType%22%2C%22SaveAlarmType%22%2C%22ViewEquipLedger%22%2C%22NotStorageTransfer%22%2C%22DeleteEquipMaintenance%22%2C%22ConfigMenuPermission%22%2C%22IndustryManage%22%2C%22SaveCustomerRole%22%2C%22ProjectGroup%22%2C%22CreateRunStrategy%22%2C%22SaveEntity%22%2C%22SaveEnergyPlan%22%2C%22ViewNYProject%22%2C%22AlarmRule%22%2C%22DeleteRunStrategy%22%2C%22SaveEntityAdmin%22%2C%22EquipUpgrade%22%2C%22DeleteCustomerMember%22%2C%22SaveWidget%22%2C%22ConfigDirectivePermission%22%2C%22UnlockEquip%22%2C%22ConfigStatusParams%22%2C%22EquipRelateArea%22%2C%22GatewayList%22%2C%22SaveProject%22%2C%22AreaConfig%22%2C%22ToggleEquip%22%2C%22RelateProject%22%2C%22SaveNoticeRule%22%2C%22ExportEquip%22%2C%22ExportEnergyRunRecord%22%2C%22SaveGateway%22%2C%22DeleteAlarmType%22%2C%22Common%22%2C%22DeleteEquipType%22%2C%22ViewEquipMaintenance%22%2C%22DeleteIndustry%22%2C%22SystemService%22%2C%22MonitorConfig%22%2C%22ResetPassword%22%2C%22DeleteProgram%22%2C%22SaveEquipModel%22%2C%22EquipUpgradeLog%22%2C%22DeleteEntity%22%2C%22EquipmentMaintenance%22%2C%22EquipTemplate%22%2C%22SaveEquipType%22%2C%22SaveCustomerRolePermission%22%2C%22SaveMenu%22%2C%22MemberManage%22%2C%22ImportEquipTemplate%22%2C%22DeleteProjectGroup%22%2C%22SaveTagGroup%22%2C%22CustomerAuthManage%22%2C%22ConfigProjectTag%22%2C%22ManageGateway%22%2C%22EnergyStation%22%2C%22DeleteGateway%22%2C%22SaveDataItemConfig%22%2C%22AIDisableDateConfig%22%2C%22SaveRole%22%2C%22EquipType%22%2C%22ImportGateway%22%2C%22EquipUpload%22%2C%22DeleteEquipTemplate%22%2C%22CreateEquipTemplateBackup%22%2C%22EquipmentLedger%22%2C%22ConfigSplitEquip%22%2C%22RollbackTemplate%22%2C%22CreateNewStrategyPlan%22%2C%22PermissionManage%22%2C%22SaveProjectGroup%22%2C%22TransferPermission%22%2C%22EquipService%22%2C%22SaveSystem%22%2C%22EditEquipLedger%22%2C%22SaveDirectiveType%22%2C%22EquipBindSystem%22%2C%22EnableRunStrategy%22%2C%22ProgramConfig%22%2C%22CCTV%22%2C%22DeleteTagGroup%22%5D%2C%22entityId%22%3A10001%2C%22entityName%22%3A%22EK-Admin%EF%BC%88%E8%BF%90%E8%90%A5%E4%B8%93%E7%94%A8%EF%BC%89%22%2C%22entityLogo%22%3A%22%22%2C%22type%22%3A3%2C%22projectGroupingIds%22%3A%5B%5D%2C%22commandGroupIds%22%3A%5B229599061540865%2C229599076220929%2C229599086706689%2C233937838342145%2C399594794057729%5D%2C%22roles%22%3A%5B%22%E8%B6%85%E7%BA%A7%E7%AE%A1%E7%90%86%E5%91%98%22%5D%2C%22expirationTime%22%3A4102415999000%7D"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PivotalParamConfigValueResp",
+                    "description": "关键参数-值响应"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "UniversalFold": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "ID",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "description": "名称"
+          },
+          "parentId": {
+            "type": "integer",
+            "description": "父节点ID",
+            "format": "int64"
+          }
+        }
+      },
+      "UniversalJsonValue": {
+        "type": "object",
+        "properties": {
+          "desc": {
+            "type": "string",
+            "description": "描述"
+          },
+          "value": {
+            "type": "string",
+            "description": "值"
+          }
+        }
+      },
+      "EquipmentSingleResp": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "设备ID",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "description": "设备名称"
+          },
+          "alias": {
+            "type": "string",
+            "description": "设备别名"
+          },
+          "modelId": {
+            "type": "integer",
+            "description": "设备型号ID",
+            "format": "int64"
+          },
+          "model": {
+            "type": "string",
+            "description": "设备型号"
+          },
+          "typeId": {
+            "type": "integer",
+            "description": "设备类型ID",
+            "format": "int64"
+          },
+          "type": {
+            "type": "string",
+            "description": "设备类型"
+          },
+          "serialNumber": {
+            "type": "string",
+            "description": "设备序列号"
+          },
+          "templateId": {
+            "type": "integer",
+            "description": "设备模板ID",
+            "format": "int64"
+          },
+          "parentId": {
+            "type": "integer",
+            "description": "父节点ID",
+            "format": "int64"
+          },
+          "mountEquipmentIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "当前设备关联的采集设备ID"
+          },
+          "projectId": {
+            "type": "integer",
+            "description": "项目ID",
+            "format": "int64"
+          },
+          "project": {
+            "type": "string",
+            "description": "项目"
+          },
+          "businessGroupingId": {
+            "type": "integer",
+            "description": "业务系统ID",
+            "format": "int64"
+          },
+          "businessGrouping": {
+            "type": "string",
+            "description": "业务系统"
+          },
+          "buildingId": {
+            "type": "integer",
+            "description": "关联的区域ID",
+            "format": "int64"
+          },
+          "building": {
+            "type": "string",
+            "description": "关联的区域"
+          }
+        }
+      },
+      "ModularGroupEquipmentExt": {
+        "type": "object",
+        "properties": {
+          "seriesType": {
+            "type": "integer",
+            "description": "系列类型 0-商用 1-家用",
+            "minimum": -127,
+            "maximum": 128
+          },
+          "mainEquipmentId": {
+            "type": "integer",
+            "description": "主机设备ID",
+            "format": "int64"
+          },
+          "slaveEquipmentIdList": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "从机设备ID"
+          }
+        }
+      },
+      "MapListLong": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "MultipleGroupEquipmentExt": {
+        "type": "object",
+        "properties": {
+          "seriesType": {
+            "type": "integer",
+            "description": "系列类型 0-商用 1-家用",
+            "minimum": -127,
+            "maximum": 128
+          },
+          "mainEquipmentId": {
+            "type": "integer",
+            "description": "主机设备ID",
+            "format": "int64"
+          },
+          "slaveEquipmentId1": {
+            "type": "integer",
+            "description": "从机1设备ID(可能为null)",
+            "format": "int64"
+          },
+          "slaveEquipmentId2": {
+            "type": "integer",
+            "description": "从机2设备ID(可能为null)",
+            "format": "int64"
+          },
+          "mainCount": {
+            "type": "integer",
+            "description": "主机数量(固定为1)"
+          },
+          "slaveCount": {
+            "type": "integer",
+            "description": "从机数量(0~2)"
+          },
+          "internalCount": {
+            "type": "integer",
+            "description": "内机数量"
+          },
+          "internalType": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UniversalJsonValue",
+              "description": "com.ek.cloud.universal.UniversalJsonValue"
+            },
+            "description": "内机类型 key为内机机型采集值 value 为对应的内机机型描述"
+          },
+          "internalType2Equipment": {
+            "$ref": "#/components/schemas/MapListLong",
+            "description": "内机类型设备 key为内机机型采集值 value 为对应的内机设备ID"
+          }
+        }
+      },
+      "MultipleEquipmentSingleResp": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "设备ID",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "description": "设备名称"
+          },
+          "serialNumber": {
+            "type": "string",
+            "description": "设备序列号"
+          },
+          "lock": {
+            "type": "integer",
+            "description": "是否已锁定 0-否 1-是",
+            "minimum": -127,
+            "maximum": 128
+          },
+          "selfTest": {
+            "type": "integer",
+            "description": "是否已自检 0-否 1-是",
+            "minimum": -127,
+            "maximum": 128
+          }
+        }
+      },
+      "GatewayExtConfig": {
+        "type": "object",
+        "properties": {
+          "collectCycle": {
+            "type": "integer",
+            "description": "",
+            "format": "int64"
+          },
+          "offlineCycleRatio": {
+            "type": "number",
+            "description": ""
+          }
+        }
+      },
+      "EquipmentResp": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "设备ID",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "description": "设备名称"
+          },
+          "alias": {
+            "type": "string",
+            "description": "设备别名"
+          },
+          "serialNumber": {
+            "type": "string",
+            "description": "设备序列号"
+          },
+          "modelId": {
+            "type": "integer",
+            "description": "设备型号ID",
+            "format": "int64"
+          },
+          "model": {
+            "type": "string",
+            "description": "设备型号"
+          },
+          "gatewayId": {
+            "type": "integer",
+            "description": "网关ID",
+            "format": "int64"
+          },
+          "gateway": {
+            "type": "string",
+            "description": "网关"
+          },
+          "gatewayIot": {
+            "type": "string",
+            "description": "网关Iot"
+          },
+          "slave": {
+            "type": "string",
+            "description": "设备地址(从站)"
+          },
+          "typeId": {
+            "type": "integer",
+            "description": "设备类型ID",
+            "format": "int64"
+          },
+          "rootTypeId": {
+            "type": "integer",
+            "description": "设备类型根节点ID",
+            "format": "int64"
+          },
+          "type": {
+            "type": "string",
+            "description": "设备类型"
+          },
+          "runStatus": {
+            "type": "integer",
+            "description": "运行状态: -1：未知、0：离线 1：在线 2：运行中 3：停机",
+            "minimum": -127,
+            "maximum": 128
+          },
+          "version": {
+            "type": "string",
+            "description": "程序版本 eg:v1.0.2"
+          },
+          "status": {
+            "type": "integer",
+            "description": "0-停用 1-启用",
+            "minimum": -127,
+            "maximum": 128
+          },
+          "mounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UniversalFold",
+              "description": "com.ek.cloud.universal.UniversalFold"
+            },
+            "description": "当前设备(指非采集设备)关联的采集设备"
+          },
+          "virtual": {
+            "type": "integer",
+            "description": "是否虚拟拆分设备 0-否 1-是",
+            "minimum": -127,
+            "maximum": 128
+          },
+          "virtualMeter": {
+            "type": "integer",
+            "description": "是否虚拟计算设备 0-否 1-是",
+            "minimum": -127,
+            "maximum": 128
+          },
+          "templateId": {
+            "type": "integer",
+            "description": "设备模板ID",
+            "format": "int64"
+          },
+          "template": {
+            "type": "string",
+            "description": "设备模板"
+          },
+          "entityId": {
+            "type": "integer",
+            "description": "企业(客户)ID",
+            "format": "int64"
+          },
+          "entity": {
+            "type": "string",
+            "description": "企业(客户)"
+          },
+          "projectId": {
+            "type": "integer",
+            "description": "项目ID",
+            "format": "int64"
+          },
+          "project": {
+            "type": "string",
+            "description": "项目"
+          },
+          "businessGroupingId": {
+            "type": "integer",
+            "description": "业务系统ID",
+            "format": "int64"
+          },
+          "businessGrouping": {
+            "type": "string",
+            "description": "业务系统"
+          },
+          "parentId": {
+            "type": "integer",
+            "description": "父节点ID",
+            "format": "int64"
+          },
+          "modularGroupEquipmentExt": {
+            "$ref": "#/components/schemas/ModularGroupEquipmentExt",
+            "description": "模块机组拓展配置项"
+          },
+          "multipleGroupEquipmentExt": {
+            "$ref": "#/components/schemas/MultipleGroupEquipmentExt",
+            "description": "多联机组拓展配置项"
+          },
+          "multipleEquipmentDetail": {
+            "$ref": "#/components/schemas/MultipleEquipmentSingleResp",
+            "description": "多联机组实时详情(比如锁定状态、自检状态)"
+          },
+          "hasUnrecoveredAlarm": {
+            "type": "integer",
+            "description": "存在未恢复报警(0-否 1-是)",
+            "minimum": -127,
+            "maximum": 128
+          },
+          "offlineRuleExt": {
+            "$ref": "#/components/schemas/GatewayExtConfig",
+            "description": "离线规则"
+          },
+          "createTime": {
+            "type": "string",
+            "description": ""
+          },
+          "modifyTime": {
+            "type": "string",
+            "description": ""
+          },
+          "dataSourceEquipmentId": {
+            "type": "integer",
+            "description": "",
+            "format": "int64"
+          }
+        }
+      },
+      "PivotalParamConfigValueResp": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "参数名"
+          },
+          "enName": {
+            "type": "string",
+            "description": "参数英文名"
+          },
+          "value": {
+            "type": "string",
+            "description": "参数值"
+          },
+          "unit": {
+            "type": "string",
+            "description": "参数单位 eg:℃"
+          },
+          "equipment": {
+            "type": "string",
+            "description": "所属设备"
+          },
+          "equipmentId": {
+            "type": "integer",
+            "description": "所属设备ID",
+            "format": "int64"
+          },
+          "splitGroup": {
+            "type": "string",
+            "description": "所属参数组"
+          },
+          "splitGroupId": {
+            "type": "integer",
+            "description": "所属参数组ID",
+            "format": "int64"
+          },
+          "splitGroupSort": {
+            "type": "integer",
+            "description": "所属参数组顺序"
+          }
+        }
+      }
+    },
+    "responses": {},
+    "securitySchemes": {}
+  },
+  "servers": [],
+  "security": []
+}
