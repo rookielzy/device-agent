@@ -7,12 +7,18 @@ import { ApiRequestValidationError, ApiResponseValidationError, createApiError }
 import { createAgentInterpreter } from "./agent/agent-factory.js";
 import type { AgentInterpreter } from "./agent/agent-interpreter.js";
 import { SimulatedDeviceService } from "./domain/devices/simulated-device-service.js";
+import { JavaPlatformClient } from "./domain/platform/java-platform-client.js";
+import { PlatformCapabilityService } from "./domain/platform/platform-capability-service.js";
 import { TaskService, type TaskServiceOptions } from "./domain/tasks/task-service.js";
 import type { AppConfig } from "./config/env.js";
 import { registerSimulatedDeviceRoutes } from "./routes/simulated-devices.js";
 import { registerTaskRoutes } from "./routes/tasks.js";
 
 const DEFAULT_BODY_LIMIT_BYTES = 16_384;
+export type PlatformCapabilityServiceDependency = Pick<
+  PlatformCapabilityService,
+  "listProjectsOrAreas" | "searchDevices" | "getEquipmentDetail" | "getRuntimeParams" | "readAirConditionerStatus"
+>;
 
 export type AppDependencies = {
   taskService: TaskService;
@@ -24,6 +30,7 @@ export type BuildAppOptions = {
   config?: AppConfig;
   interpreter?: AgentInterpreter;
   simulatedDeviceService?: SimulatedDeviceService;
+  platformCapabilityService?: PlatformCapabilityServiceDependency;
   agentInterpreterFactory?: typeof createAgentInterpreter;
   taskServiceOptions?: Omit<TaskServiceOptions, "interpreter" | "deviceService">;
   fastify?: FastifyServerOptions;
@@ -31,12 +38,16 @@ export type BuildAppOptions = {
 };
 
 export function createAppDependencies(options: Omit<BuildAppOptions, "dependencies" | "fastify"> = {}): AppDependencies {
+  const config = options.config;
   const simulatedDeviceService = options.simulatedDeviceService ?? new SimulatedDeviceService({
     ...(options.taskServiceOptions?.clock ? { clock: options.taskServiceOptions.clock } : {})
   });
+  const platformCapabilityService: PlatformCapabilityServiceDependency | undefined =
+    options.platformCapabilityService ?? (config ? createPlatformCapabilityService(config) : undefined);
   const interpreter = options.interpreter ?? (options.agentInterpreterFactory ?? createAgentInterpreter)({
-    config: requireConfig(options.config),
-    deviceService: simulatedDeviceService
+    config: requireConfig(config),
+    deviceService: simulatedDeviceService,
+    ...(platformCapabilityService ? { platformService: platformCapabilityService } : {})
   });
   const taskService = new TaskService({
     interpreter,
@@ -48,6 +59,23 @@ export function createAppDependencies(options: Omit<BuildAppOptions, "dependenci
     taskService,
     simulatedDeviceService
   };
+}
+
+function createPlatformCapabilityService(config: AppConfig): PlatformCapabilityService | undefined {
+  if (config.deviceCapabilityMode !== "platform") {
+    return undefined;
+  }
+
+  if (!config.platform) {
+    throw new Error("Platform device capability mode requires parsed platform config");
+  }
+
+  return new PlatformCapabilityService({
+    validationProjectId: config.platform.validationProjectId,
+    client: new JavaPlatformClient({
+      config: config.platform
+    })
+  });
 }
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {

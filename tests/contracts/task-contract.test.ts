@@ -28,6 +28,7 @@ describe("environment configuration", () => {
       host: "127.0.0.1",
       port: 3000,
       interpreterMode: "fake",
+      deviceCapabilityMode: "simulated",
       deepseek: {
         model: "deepseek-v4-flash"
       },
@@ -56,6 +57,7 @@ describe("environment configuration", () => {
       host: "0.0.0.0",
       port: 8080,
       interpreterMode: "deepseek",
+      deviceCapabilityMode: "simulated",
       deepseek: {
         apiKey: "test-key",
         model: "deepseek-v4-pro"
@@ -72,6 +74,117 @@ describe("environment configuration", () => {
   it("rejects invalid ports and unknown interpreter modes", () => {
     expect(() => parseEnv({ PORT: "70000" })).toThrow(ConfigError);
     expect(() => parseEnv({ AGENT_INTERPRETER_MODE: "live" })).toThrow(ConfigError);
+  });
+
+  it("parses simulated device-capability mode without platform config", () => {
+    const config = parseEnv({
+      AGENT_INTERPRETER_MODE: "deepseek",
+      DEEPSEEK_API_KEY: "test-key",
+      AGENT_DEVICE_CAPABILITY_MODE: "simulated"
+    });
+
+    expect(config.deviceCapabilityMode).toBe("simulated");
+    expect(config.platform).toBeUndefined();
+  });
+
+  it("rejects real-platform mode without DeepSeek or platform credentials", () => {
+    expect(() =>
+      parseEnv({
+        AGENT_DEVICE_CAPABILITY_MODE: "platform"
+      })
+    ).toThrow("AGENT_DEVICE_CAPABILITY_MODE=platform requires AGENT_INTERPRETER_MODE=deepseek");
+
+    expect(() =>
+      parseEnv({
+        AGENT_INTERPRETER_MODE: "deepseek",
+        DEEPSEEK_API_KEY: "test-key",
+        AGENT_DEVICE_CAPABILITY_MODE: "platform"
+      })
+    ).toThrow(/PLATFORM_USER_CENTER_BASE_URL/);
+  });
+
+  it("parses real-platform mode with default project ID and supplied timeout", () => {
+    const config = parseEnv({
+      AGENT_INTERPRETER_MODE: "deepseek",
+      DEEPSEEK_API_KEY: "test-key",
+      AGENT_DEVICE_CAPABILITY_MODE: "platform",
+      PLATFORM_USER_CENTER_BASE_URL: "https://user.example.test",
+      PLATFORM_IOT_BASE_URL: "https://iot.example.test",
+      PLATFORM_VALIDATION_MOBILE: "13800000000",
+      PLATFORM_VALIDATION_PASSWORD: "secret",
+      PLATFORM_REQUEST_TIMEOUT_MS: "2500"
+    });
+
+    expect(config.platform).toEqual({
+      userCenterBaseUrl: "https://user.example.test",
+      iotBaseUrl: "https://iot.example.test",
+      validationMobile: "13800000000",
+      validationPassword: "secret",
+      validationProjectId: "270544150790145",
+      requestTimeoutMs: 2500
+    });
+  });
+
+  it("parses supplied project ID and rejects invalid request timeout config", () => {
+    expect(parseEnv({
+      AGENT_INTERPRETER_MODE: "deepseek",
+      DEEPSEEK_API_KEY: "test-key",
+      AGENT_DEVICE_CAPABILITY_MODE: "platform",
+      PLATFORM_USER_CENTER_BASE_URL: "https://user.example.test",
+      PLATFORM_IOT_BASE_URL: "https://iot.example.test",
+      PLATFORM_VALIDATION_MOBILE: "13800000000",
+      PLATFORM_VALIDATION_PASSWORD: "secret",
+      PLATFORM_VALIDATION_PROJECT_ID: "123",
+      PLATFORM_REQUEST_TIMEOUT_MS: "3000"
+    }).platform?.validationProjectId).toBe("123");
+
+    for (const timeout of ["0", "-1", "1.5"]) {
+      expect(() =>
+        parseEnv({
+          AGENT_INTERPRETER_MODE: "deepseek",
+          DEEPSEEK_API_KEY: "test-key",
+          AGENT_DEVICE_CAPABILITY_MODE: "platform",
+          PLATFORM_USER_CENTER_BASE_URL: "https://user.example.test",
+          PLATFORM_IOT_BASE_URL: "https://iot.example.test",
+          PLATFORM_VALIDATION_MOBILE: "13800000000",
+          PLATFORM_VALIDATION_PASSWORD: "secret",
+          PLATFORM_REQUEST_TIMEOUT_MS: timeout
+        })
+      ).toThrow(ConfigError);
+    }
+  });
+
+  it("rejects platform mode on externally bound hosts and non-http platform URLs", () => {
+    const validPlatformEnv = {
+      AGENT_INTERPRETER_MODE: "deepseek",
+      DEEPSEEK_API_KEY: "test-key",
+      AGENT_DEVICE_CAPABILITY_MODE: "platform",
+      PLATFORM_USER_CENTER_BASE_URL: "https://user.example.test",
+      PLATFORM_IOT_BASE_URL: "https://iot.example.test",
+      PLATFORM_VALIDATION_MOBILE: "13800000000",
+      PLATFORM_VALIDATION_PASSWORD: "secret"
+    };
+
+    expect(() =>
+      parseEnv({
+        ...validPlatformEnv,
+        HOST: "0.0.0.0"
+      })
+    ).toThrow("AGENT_DEVICE_CAPABILITY_MODE=platform is limited to localhost or 127.0.0.1");
+
+    expect(() =>
+      parseEnv({
+        ...validPlatformEnv,
+        PLATFORM_USER_CENTER_BASE_URL: "file:///tmp/user-center"
+      })
+    ).toThrow("PLATFORM_USER_CENTER_BASE_URL must be an absolute http(s) URL");
+
+    expect(() =>
+      parseEnv({
+        ...validPlatformEnv,
+        PLATFORM_IOT_BASE_URL: "iot.example.test"
+      })
+    ).toThrow("PLATFORM_IOT_BASE_URL must be an absolute http(s) URL");
   });
 });
 

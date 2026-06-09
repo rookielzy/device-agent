@@ -3,12 +3,18 @@ import { describe, expect, it } from "vitest";
 import {
   executionStateSchema,
   taskOutcomeReasonSchema,
+  timelineSourceSchema,
   timelineStageSchema
 } from "../../src/contracts/task-contract.js";
 import { sampleTextFor } from "../fixtures/sample-utterances.js";
 
 const readme = readFileSync("README.md", "utf8");
 const contractDoc = readFileSync("docs/contracts/agent-plan-contract.md", "utf8");
+const openApi = JSON.parse(readFileSync("docs/openapi/device-agent.openapi.json", "utf8")) as {
+  components: {
+    schemas: Record<string, { enum?: string[] }>;
+  };
+};
 
 describe("developer documentation regression", () => {
   it("keeps README quickstart examples tied to covered fake-mode utterances", () => {
@@ -50,6 +56,13 @@ describe("developer documentation regression", () => {
     for (const outcomeReason of taskOutcomeReasonSchema.options) {
       expect(contractDoc).toContain(outcomeReason);
     }
+  });
+
+  it("keeps OpenAPI public enums aligned with exported task schemas", () => {
+    expect(openApi.components.schemas.ExecutionState?.enum).toEqual(executionStateSchema.options);
+    expect(openApi.components.schemas.TaskOutcomeReason?.enum).toEqual(taskOutcomeReasonSchema.options);
+    expect(openApi.components.schemas.TimelineStage?.enum).toEqual(timelineStageSchema.options);
+    expect(openApi.components.schemas.TimelineSource?.enum).toEqual(timelineSourceSchema.options);
   });
 
   it("documents the provider-neutral boundary and simulated-device debug envelope", () => {

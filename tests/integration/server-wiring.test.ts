@@ -6,6 +6,7 @@ import { buildApp } from "../../src/app.js";
 import { parseEnv } from "../../src/config/env.js";
 import { createRuntimeDependencies, isDirectExecutionPath, shouldExposeDebugRoutes, startServer } from "../../src/server.js";
 import { createFixedInterpreter, livingRoomStatusProposal } from "../fixtures/task-fixtures.js";
+import { financeRoomAirConditionerDetail, financeRoomPivotalParams } from "../fixtures/platform-api-fixtures.js";
 
 describe("server runtime wiring", () => {
   it("points package startup scripts at the emitted server entrypoint", () => {
@@ -65,6 +66,7 @@ describe("server runtime wiring", () => {
     const factory = vi.fn((options: CreateAgentInterpreterOptions): AgentInterpreter => {
       expect(options.config.deepseek.apiKey).toBe("test-key");
       expect(options.config.deepseek.model).toBe("deepseek-test-model");
+      expect(options.config.deviceCapabilityMode).toBe("simulated");
       expect(options.deviceService?.debugSnapshot().length).toBeGreaterThan(0);
 
       return createFixedInterpreter(livingRoomStatusProposal);
@@ -75,6 +77,66 @@ describe("server runtime wiring", () => {
     });
 
     expect(factory).toHaveBeenCalledOnce();
+  });
+
+  it("constructs platform-mode dependencies with injected platform service and factory wiring", async () => {
+    const config = parseEnv({
+      AGENT_INTERPRETER_MODE: "deepseek",
+      AGENT_DEVICE_CAPABILITY_MODE: "platform",
+      DEEPSEEK_API_KEY: "test-key",
+      PLATFORM_USER_CENTER_BASE_URL: "https://user.example.test",
+      PLATFORM_IOT_BASE_URL: "https://iot.example.test",
+      PLATFORM_VALIDATION_MOBILE: "13800000000",
+      PLATFORM_VALIDATION_PASSWORD: "secret",
+      PORT: "3000"
+    });
+    const platformService = createPlatformService();
+    const factory = vi.fn((options: CreateAgentInterpreterOptions): AgentInterpreter => {
+      expect(options.config.deviceCapabilityMode).toBe("platform");
+      expect(options.platformService).toBe(platformService);
+
+      return createFixedInterpreter({
+        kind: "platform_status_query",
+        result: {
+          kind: "platform_status_success",
+          device: {
+            deviceId: "99887766",
+            displayName: "财务室空调",
+            room: "财务室",
+            type: "air_conditioner",
+            availability: { online: true },
+            capabilities: ["platform_read"],
+            readableValues: [],
+            writableControls: []
+          },
+          dataItems: [
+            {
+              deviceId: "99887766",
+              itemId: "returnairtemperature",
+              name: "回风温度",
+              value: 23.5,
+              metadata: {
+                kind: "number",
+                label: "回风温度",
+                unit: "℃"
+              },
+              freshness: "fresh"
+            }
+          ],
+          returnAirTemperature: 23.5
+        }
+      });
+    });
+
+    const dependencies = createRuntimeDependencies(config, {
+      platformCapabilityService: platformService,
+      agentInterpreterFactory: factory
+    });
+    const result = await dependencies.taskService.createTask("A 项目 1 楼财务室空调开着吗，现在多少度");
+
+    expect(factory).toHaveBeenCalledOnce();
+    expect(result.executionState).toBe("completed");
+    expect(result.timeline.map((event) => event.stage)).toContain("platform_runtime_read");
   });
 
   it("gates debug routes for externally bound runtime servers unless explicitly enabled", async () => {
@@ -175,3 +237,35 @@ describe("server runtime wiring", () => {
     })).rejects.toThrow("port unavailable");
   });
 });
+
+function createPlatformService() {
+  return {
+    async listProjectsOrAreas() {
+      return {
+        kind: "project_list_success" as const,
+        projects: []
+      };
+    },
+    async searchDevices() {
+      return {
+        kind: "search_success" as const,
+        raw: [],
+        candidates: []
+      };
+    },
+    async getEquipmentDetail() {
+      return financeRoomAirConditionerDetail;
+    },
+    async getRuntimeParams() {
+      return financeRoomPivotalParams;
+    },
+    async readAirConditionerStatus() {
+      return {
+        kind: "unavailable" as const,
+        reason: "metadata_unrecognized" as const,
+        message: "metadata unavailable",
+        stage: "platform_runtime_read" as const
+      };
+    }
+  };
+}

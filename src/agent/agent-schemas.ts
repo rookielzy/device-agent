@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   deviceTypeSchema,
   publicValueSchema,
+  selectedDataItemSchema,
   simulatedDeviceContextSchema
 } from "../contracts/device-contract.js";
 import type { ControlTarget, DeviceTarget } from "../domain/devices/device-types.js";
@@ -119,12 +120,69 @@ export const parseFailureProposalSchema = z
   })
   .strict();
 
+const platformUnavailableReasonSchema = z.enum([
+  "platform_auth_failed",
+  "platform_timeout",
+  "platform_error",
+  "platform_no_data",
+  "device_not_found",
+  "device_offline",
+  "metadata_unrecognized"
+]);
+
+const platformFailureStageSchema = z.enum([
+  "platform_auth",
+  "platform_search",
+  "platform_detail",
+  "platform_runtime_read"
+]);
+
+const platformStatusSuccessResultSchema = z.object({
+  kind: z.literal("platform_status_success"),
+  device: simulatedDeviceContextSchema,
+  dataItems: z.array(selectedDataItemSchema).default([]),
+  switchState: z.boolean().optional(),
+  returnAirTemperature: z.number().optional(),
+  runStatusHint: z.enum(["unknown", "offline", "online", "running", "stopped"]).optional()
+}).strict();
+
+const platformStatusAmbiguousResultSchema = z.object({
+  kind: z.literal("ambiguous"),
+  reason: z.literal("ambiguous_target"),
+  candidates: z.array(simulatedDeviceContextSchema).default([]),
+  stage: z.literal("platform_search").default("platform_search")
+}).strict();
+
+const platformStatusUnavailableResultSchema = z.object({
+  kind: z.literal("unavailable"),
+  reason: platformUnavailableReasonSchema,
+  device: simulatedDeviceContextSchema.optional(),
+  candidates: z.array(simulatedDeviceContextSchema).default([]),
+  stage: platformFailureStageSchema
+}).strict();
+
+export const platformStatusResultSchema = z.discriminatedUnion("kind", [
+  platformStatusSuccessResultSchema,
+  platformStatusAmbiguousResultSchema,
+  platformStatusUnavailableResultSchema
+]);
+
+export const platformStatusProposalSchema = z
+  .object({
+    kind: z.literal("platform_status_query"),
+    result: platformStatusResultSchema,
+    summary: z.string().min(1).optional(),
+    confidence: z.number().min(0).max(1).optional()
+  })
+  .strict();
+
 export const agentProposalSchema = z.discriminatedUnion("kind", [
   statusQueryProposalSchema,
   controlRequestProposalSchema,
   ambiguousProposalSchema,
   unsupportedProposalSchema,
-  parseFailureProposalSchema
+  parseFailureProposalSchema,
+  platformStatusProposalSchema
 ]);
 
 export type AgentProposal = z.infer<typeof agentProposalSchema>;

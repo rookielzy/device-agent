@@ -1,7 +1,12 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FastifyInstance } from "fastify";
-import { buildApp, createAppDependencies, type AppDependencies } from "./app.js";
+import {
+  buildApp,
+  createAppDependencies,
+  type AppDependencies,
+  type PlatformCapabilityServiceDependency
+} from "./app.js";
 import { createAgentInterpreter, type CreateAgentInterpreterOptions } from "./agent/agent-factory.js";
 import type { AgentInterpreter } from "./agent/agent-interpreter.js";
 import { parseEnv, type AppConfig } from "./config/env.js";
@@ -9,6 +14,7 @@ import { SimulatedDeviceService } from "./domain/devices/simulated-device-servic
 
 export type RuntimeDependencyOverrides = {
   simulatedDeviceService?: SimulatedDeviceService;
+  platformCapabilityService?: PlatformCapabilityServiceDependency;
   interpreter?: AgentInterpreter;
   agentInterpreterFactory?: (options: CreateAgentInterpreterOptions) => AgentInterpreter;
 };
@@ -24,6 +30,7 @@ export function createRuntimeDependencies(config: AppConfig, overrides: RuntimeD
   return createAppDependencies({
     config,
     ...(overrides.simulatedDeviceService ? { simulatedDeviceService: overrides.simulatedDeviceService } : {}),
+    ...(overrides.platformCapabilityService ? { platformCapabilityService: overrides.platformCapabilityService } : {}),
     ...(overrides.interpreter ? { interpreter: overrides.interpreter } : {}),
     agentInterpreterFactory: overrides.agentInterpreterFactory ?? createAgentInterpreter
   });

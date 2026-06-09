@@ -11,7 +11,29 @@ export const DEEPSEEK_INTERPRETER_SYSTEM_PROMPT = [
   "Do not include LangChain messages, tool calls, run ids, provider metadata, or raw model payloads in the proposal."
 ].join("\n");
 
-export function buildInterpreterUserPrompt(originalText: string): string {
+export const DEEPSEEK_PLATFORM_INTERPRETER_SYSTEM_PROMPT = [
+  "You interpret text requests for an internal real-platform IoT query mode.",
+  "Return only one normalized proposal kind: platform_status_query, ambiguous, unsupported, or parse_failure.",
+  "Real-platform V1 is read-only. Never propose or execute device control.",
+  "Use platform tools to search equipment, inspect detail, and read pivotal runtime parameters.",
+  "For air-conditioner temperature questions, use return-air temperature. Do not use supply-air temperature unless the user explicitly asks for it.",
+  "If exactly one matching equipment candidate exists, continue to detail and runtime lookup.",
+  "If multiple plausible equipment candidates exist, return ambiguous instead of guessing or aggregating.",
+  "If platform metadata cannot identify return-air temperature, return a platform_status_query result with metadata_unrecognized rather than inventing a value.",
+  "DeepSeek must produce JSON-compatible structured output matching the response schema exactly.",
+  "Do not include LangChain messages, tool calls, run ids, provider metadata, auth tokens, passwords, platform request URLs, or raw model payloads in the proposal."
+].join("\n");
+
+export function buildInterpreterUserPrompt(originalText: string, options: { platformMode?: boolean } = {}): string {
+  if (options.platformMode) {
+    return [
+      "Interpret this user request as a single read-only real-platform device proposal.",
+      "Use platform tools when needed and keep the proposal provider-neutral.",
+      "",
+      `User request: ${originalText}`
+    ].join("\n");
+  }
+
   return [
     "Interpret this user request as a single simulated-device proposal.",
     "Keep the proposal provider-neutral and service-owned.",

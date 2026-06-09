@@ -39,6 +39,11 @@ export const taskOutcomeReasonSchema = z.enum([
   "pending_control_already_rejected",
   "control_rejected",
   "confirmation_failed",
+  "platform_auth_failed",
+  "platform_timeout",
+  "platform_error",
+  "platform_no_data",
+  "metadata_unrecognized",
   "service_error"
 ]);
 
@@ -48,6 +53,10 @@ export const timelineStageSchema = z.enum([
   "service_validation",
   "device_resolution",
   "simulated_read",
+  "platform_auth",
+  "platform_search",
+  "platform_detail",
+  "platform_runtime_read",
   "confirmation_required",
   "confirmation_received",
   "simulated_execution",
@@ -58,7 +67,8 @@ export const timelineSourceSchema = z.enum([
   "client",
   "model",
   "service",
-  "simulated_device"
+  "simulated_device",
+  "platform"
 ]);
 
 export const timelineStatusSchema = z.enum([

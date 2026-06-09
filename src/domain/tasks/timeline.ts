@@ -92,6 +92,42 @@ export class TimelineBuilder {
     });
   }
 
+  platformAuth(status: TimelineStatus, detail: string): TimelineEvent {
+    return this.event({
+      stage: "platform_auth",
+      source: "platform",
+      status,
+      detail
+    });
+  }
+
+  platformSearch(status: TimelineStatus, detail: string): TimelineEvent {
+    return this.event({
+      stage: "platform_search",
+      source: "platform",
+      status,
+      detail
+    });
+  }
+
+  platformDetail(status: TimelineStatus, detail: string): TimelineEvent {
+    return this.event({
+      stage: "platform_detail",
+      source: "platform",
+      status,
+      detail
+    });
+  }
+
+  platformRuntimeRead(status: TimelineStatus, detail: string): TimelineEvent {
+    return this.event({
+      stage: "platform_runtime_read",
+      source: "platform",
+      status,
+      detail
+    });
+  }
+
   confirmationRequired(detail: string): TimelineEvent {
     return this.event({
       stage: "confirmation_required",

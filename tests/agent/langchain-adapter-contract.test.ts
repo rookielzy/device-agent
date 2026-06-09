@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 import { StructuredOutputParsingError } from "langchain";
-import { DEEPSEEK_INTERPRETER_SYSTEM_PROMPT } from "../../src/agent/agent-prompts.js";
+import {
+  DEEPSEEK_INTERPRETER_SYSTEM_PROMPT,
+  DEEPSEEK_PLATFORM_INTERPRETER_SYSTEM_PROMPT
+} from "../../src/agent/agent-prompts.js";
 import { agentProposalSchema } from "../../src/agent/agent-schemas.js";
 import { LangChainDeepSeekInterpreter, type AgentInvoker } from "../../src/agent/langchain-deepseek-interpreter.js";
 import { SimulatedDeviceService } from "../../src/domain/devices/simulated-device-service.js";
@@ -161,8 +164,94 @@ describe("LangChainDeepSeekInterpreter contract", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({
       apiKey: "test-key",
-      model: "deepseek-test"
+      model: "deepseek-test",
+      systemPrompt: DEEPSEEK_INTERPRETER_SYSTEM_PROMPT
     });
+  });
+
+  it("uses platform tools and platform prompt when real-platform mode is enabled", async () => {
+    const calls: unknown[] = [];
+    const interpreter = new LangChainDeepSeekInterpreter({
+      apiKey: "test-key",
+      model: "deepseek-test",
+      deviceCapabilityMode: "platform",
+      platformService: createPlatformService(),
+      agentFactory: (input) => {
+        calls.push(input);
+
+        return {
+          async invoke() {
+            return {
+              structuredResponse: {
+                kind: "platform_status_query",
+                result: {
+                  kind: "unavailable",
+                  reason: "metadata_unrecognized",
+                  stage: "platform_runtime_read"
+                }
+              }
+            };
+          }
+        };
+      }
+    });
+
+    const proposal = await interpreter.interpret({
+      originalText: "A 项目 1 楼财务室空调开着吗，现在多少度"
+    });
+
+    expect(proposal.kind).toBe("platform_status_query");
+    expect(calls[0]).toMatchObject({
+      systemPrompt: DEEPSEEK_PLATFORM_INTERPRETER_SYSTEM_PROMPT
+    });
+    expect((calls[0] as { tools: Array<{ name: string }> }).tools.map((tool) => tool.name)).toContain("read_platform_air_conditioner_status");
+  });
+
+  it("requires platform service when platform mode constructs a real agent", () => {
+    expect(() =>
+      new LangChainDeepSeekInterpreter({
+        apiKey: "test-key",
+        model: "deepseek-test",
+        deviceCapabilityMode: "platform"
+      })
+    ).toThrow("Platform device capability mode requires a platformService");
+  });
+
+  it("maps malformed platform status structured output to sanitized parse_failure", async () => {
+    const missingFields = await createInterpreter({
+      structuredResponse: {
+        kind: "platform_status_query",
+        result: {
+          kind: "platform_status_success"
+        }
+      }
+    }).interpret({
+      originalText: "A 项目 1 楼财务室空调开着吗，现在多少度"
+    });
+    const rawPayload = await createInterpreter({
+      structuredResponse: {
+        kind: "platform_status_query",
+        result: {
+          kind: "unavailable",
+          reason: "platform_error",
+          stage: "platform_detail",
+          message: "raw provider payload tool_calls serialNumber"
+        }
+      }
+    }).interpret({
+      originalText: "A 项目 1 楼财务室空调开着吗，现在多少度"
+    });
+
+    expect(missingFields).toMatchObject({
+      kind: "parse_failure",
+      reason: "schema_invalid"
+    });
+    expect(rawPayload).toMatchObject({
+      kind: "parse_failure",
+      reason: "schema_invalid"
+    });
+    expect(JSON.stringify(rawPayload)).not.toContain("serialNumber");
+    expect(JSON.stringify(rawPayload)).not.toContain("tool_calls");
   });
 
   it("keeps prompt and response schema aligned with provider-neutral proposal vocabulary", () => {
@@ -171,8 +260,19 @@ describe("LangChainDeepSeekInterpreter contract", () => {
     expect(DEEPSEEK_INTERPRETER_SYSTEM_PROMPT).toContain("ambiguous");
     expect(DEEPSEEK_INTERPRETER_SYSTEM_PROMPT).toContain("never executes");
     expect(DEEPSEEK_INTERPRETER_SYSTEM_PROMPT).toContain("structured output");
+    expect(DEEPSEEK_PLATFORM_INTERPRETER_SYSTEM_PROMPT).toContain("read-only");
+    expect(DEEPSEEK_PLATFORM_INTERPRETER_SYSTEM_PROMPT).toContain("return-air temperature");
 
     expect(agentProposalSchema.safeParse(livingRoomStatusProposal).success).toBe(true);
+    expect(agentProposalSchema.safeParse({
+      kind: "platform_status_query",
+      result: {
+        kind: "unavailable",
+        reason: "metadata_unrecognized",
+        candidates: [],
+        stage: "platform_runtime_read"
+      }
+    }).success).toBe(true);
     expect(
       agentProposalSchema.safeParse({
         ...livingRoomStatusProposal,
@@ -208,4 +308,41 @@ function createInterpreter(options: {
     agent,
     ...(options.deviceService ? { deviceService: options.deviceService } : {})
   });
+}
+
+function createPlatformService() {
+  return {
+    async listProjectsOrAreas() {
+      return {
+        kind: "project_list_success" as const,
+        projects: []
+      };
+    },
+    async searchDevices() {
+      return {
+        kind: "search_success" as const,
+        raw: [],
+        candidates: []
+      };
+    },
+    async getEquipmentDetail() {
+      return {
+        kind: "unavailable" as const,
+        reason: "platform_no_data" as const,
+        message: "No data",
+        stage: "platform_detail" as const
+      };
+    },
+    async getRuntimeParams() {
+      return [];
+    },
+    async readAirConditionerStatus() {
+      return {
+        kind: "unavailable" as const,
+        reason: "metadata_unrecognized" as const,
+        message: "metadata unavailable",
+        stage: "platform_runtime_read" as const
+      };
+    }
+  };
 }

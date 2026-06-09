@@ -24,6 +24,14 @@ import {
   toDeviceTarget
 } from "../../agent/agent-interpreter.js";
 import type {
+  PlatformFailureStage
+} from "../platform/platform-capability-service.js";
+import {
+  isReturnAirTemperatureDataItem,
+  isSupplyAirTemperatureDataItem,
+  isSwitchDataItem
+} from "../platform/platform-mappers.js";
+import type {
   AmbiguousResult,
   DeviceControlApplyResult,
   DeviceControlProposalResult,
@@ -51,6 +59,11 @@ import {
 } from "./task-types.js";
 
 const defaultClock: Clock = () => new Date();
+
+type PlatformProposalResult = Extract<AgentProposal, { kind: "platform_status_query" }>["result"];
+type PlatformProposalSuccess = Extract<PlatformProposalResult, { kind: "platform_status_success" }>;
+type PlatformProposalAmbiguous = Extract<PlatformProposalResult, { kind: "ambiguous" }>;
+type PlatformProposalUnavailable = Extract<PlatformProposalResult, { kind: "unavailable" }>;
 
 export type TaskServiceOptions = {
   interpreter: AgentInterpreter;
@@ -141,6 +154,8 @@ export class TaskService {
         return this.#createStatusTask(taskId, originalText, proposal, timeline);
       case "control_request":
         return this.#createControlTask(taskId, originalText, proposal, timeline);
+      case "platform_status_query":
+        return this.#createPlatformStatusTask(taskId, originalText, proposal, timeline);
       case "ambiguous":
         timeline.serviceValidation("blocked", proposal.reason);
 
@@ -536,6 +551,71 @@ export class TaskService {
     }));
   }
 
+  async #createPlatformStatusTask(
+    taskId: string,
+    originalText: string,
+    proposal: Extract<AgentProposal, { kind: "platform_status_query" }>,
+    timeline: TimelineBuilder
+  ): Promise<TaskResult> {
+    timeline.serviceValidation("succeeded", "Validated platform status-query proposal");
+    appendPlatformTimeline(timeline, proposal.result);
+
+    if (proposal.result.kind === "platform_status_success") {
+      return this.#saveTask({
+        taskId,
+        originalText,
+        classification: "status_query",
+        executionState: "completed",
+        outcomeReason: "none",
+        reply: replyForPlatformSuccess(proposal.result),
+        userReply: replyForPlatformSuccess(proposal.result),
+        plan: planFor({
+          summary: proposal.summary ?? `Answer real-platform status for ${proposal.result.device.displayName}.`,
+          confidence: proposal.confidence ?? 0.85,
+          steps: [
+            ["step-1", "Search real-platform equipment", "completed"],
+            ["step-2", "Read platform equipment detail", "completed"],
+            ["step-3", "Read pivotal runtime parameters", "completed"]
+          ]
+        }),
+        selectedContext: {
+          devices: [proposal.result.device],
+          dataItems: publicPlatformDataItems(proposal.result),
+          controlItems: [],
+          candidates: []
+        },
+        selectedDataItems: publicPlatformDataItems(proposal.result),
+        selectedControlItems: [],
+        timeline: finalEvents(timeline, "succeeded", "Returned completed platform status query")
+      });
+    }
+
+    const mapped = mapPlatformFailure(proposal.result);
+
+    return this.#saveTask({
+      taskId,
+      originalText,
+      classification: proposal.result.kind === "ambiguous" ? "ambiguous" : "status_query",
+      executionState: mapped.executionState,
+      outcomeReason: mapped.outcomeReason,
+      reply: mapped.reply,
+      plan: planFor({
+        summary: proposal.summary ?? "Return a non-success task outcome from real-platform validation.",
+        confidence: proposal.confidence ?? 0.6,
+        ...(proposal.result.kind === "ambiguous" ? { ambiguityReason: "Multiple matching platform devices were found." } : {}),
+        steps: [
+          ["step-1", "Search real-platform equipment", platformSearchStepStatus(proposal.result)],
+          ["step-2", "Read platform equipment detail", platformDetailStepStatus(proposal.result)],
+          ["step-3", "Read pivotal runtime parameters", "blocked"]
+        ]
+      }),
+      selectedContext: contextFromPlatformResult(proposal.result),
+      selectedDataItems: [],
+      selectedControlItems: [],
+      timeline: finalEvents(timeline, mapped.timelineStatus, "Returned non-success platform status outcome")
+    });
+  }
+
   #taskFromDeviceFailure(input: {
     taskId: string;
     originalText: string;
@@ -733,6 +813,8 @@ function interpretationDetail(proposal: AgentProposal): string {
       return "Classified request as status query";
     case "control_request":
       return "Classified request as control request";
+    case "platform_status_query":
+      return "Classified request as real-platform status query";
     case "ambiguous":
       return `Interpreter reported ambiguity: ${proposal.reason}`;
     case "unsupported":
@@ -740,6 +822,218 @@ function interpretationDetail(proposal: AgentProposal): string {
     case "parse_failure":
       return `Interpreter reported parse failure: ${proposal.reason}`;
   }
+}
+
+function appendPlatformTimeline(timeline: TimelineBuilder, result: PlatformProposalResult): void {
+  switch (result.kind) {
+    case "platform_status_success":
+      timeline.platformSearch("succeeded", `Resolved ${result.device.displayName}`);
+      timeline.platformDetail("succeeded", "Read platform equipment detail");
+      timeline.platformRuntimeRead("succeeded", "Read platform pivotal runtime parameters");
+      break;
+    case "ambiguous":
+      timeline.platformSearch("blocked", "Multiple matching platform devices were found");
+      break;
+    case "unavailable":
+      appendPlatformUnavailableTimeline(timeline, result);
+      break;
+  }
+}
+
+function appendPlatformUnavailableTimeline(timeline: TimelineBuilder, result: PlatformProposalUnavailable): void {
+  const stage = platformFailureStage(result);
+  const detail = platformTimelineDetail(result);
+
+  if (result.device && stage !== "platform_search" && stage !== "platform_auth") {
+    timeline.platformSearch("succeeded", `Resolved ${result.device.displayName}`);
+  }
+
+  if (result.device && stage === "platform_runtime_read") {
+    timeline.platformDetail("succeeded", "Read platform equipment detail");
+  }
+
+  appendPlatformStage(timeline, stage, platformTimelineStatus(result), detail);
+}
+
+function mapPlatformFailure(
+  result: PlatformProposalAmbiguous | PlatformProposalUnavailable
+): {
+  executionState: ExecutionState;
+  outcomeReason: TaskOutcomeReason;
+  reply: string;
+  timelineStatus: TimelineStatus;
+} {
+  if (result.kind === "ambiguous") {
+    return {
+      executionState: "needs_clarification",
+      outcomeReason: "ambiguous_target",
+      reply: "I found multiple matching platform devices. Please clarify which one to use.",
+      timelineStatus: "blocked"
+    };
+  }
+
+  return {
+    executionState: result.reason === "platform_error" || result.reason === "platform_auth_failed" ? "failed" : "unavailable",
+    outcomeReason: result.reason,
+    reply: platformReplyForUnavailable(result),
+    timelineStatus: result.reason === "platform_error" || result.reason === "platform_auth_failed" ? "failed" : "blocked"
+  };
+}
+
+function replyForPlatformSuccess(result: PlatformProposalSuccess): string {
+  const switchText = result.switchState === undefined
+    ? "开关状态无法从关键参数确认"
+    : result.switchState
+      ? "开着"
+      : "关着";
+  const temperatureText = result.returnAirTemperature === undefined
+    ? "当前温度无法从可用数据确定"
+    : `当前回风温度 ${result.returnAirTemperature}℃`;
+
+  return `${result.device.displayName}${switchText}，${temperatureText}。`;
+}
+
+function platformReplyForUnavailable(result: PlatformProposalUnavailable): string {
+  switch (result.reason) {
+    case "platform_auth_failed":
+      return "Platform authentication failed, so I could not read the device status.";
+    case "platform_timeout":
+      return "The platform request timed out, so I could not read the current device status.";
+    case "platform_error":
+      return "The platform query failed, so I could not read the current device status.";
+    case "platform_no_data":
+      return "Current platform runtime data is unavailable for that device.";
+    case "device_not_found":
+      return "No matching platform device was found.";
+    case "device_offline":
+      return `${result.device?.displayName ?? "The selected device"} is offline or has unknown platform status.`;
+    case "metadata_unrecognized":
+      return "The current temperature cannot be determined from the available platform data.";
+  }
+}
+
+function platformFailureStage(result: PlatformProposalUnavailable): PlatformFailureStage {
+  if (result.stage) {
+    return result.stage;
+  }
+
+  switch (result.reason) {
+    case "platform_auth_failed":
+      return "platform_auth";
+    case "device_offline":
+      return "platform_detail";
+    case "platform_no_data":
+    case "metadata_unrecognized":
+      return "platform_runtime_read";
+    case "device_not_found":
+    case "platform_timeout":
+    case "platform_error":
+      return "platform_search";
+  }
+}
+
+function platformTimelineStatus(result: PlatformProposalUnavailable): TimelineStatus {
+  if (result.reason === "platform_error" || result.reason === "platform_auth_failed") {
+    return "failed";
+  }
+
+  return "blocked";
+}
+
+function platformTimelineDetail(result: PlatformProposalUnavailable): string {
+  switch (result.reason) {
+    case "platform_auth_failed":
+      return "Platform authentication failed";
+    case "platform_timeout":
+      return "Platform request timed out";
+    case "platform_error":
+      return "Platform request failed";
+    case "platform_no_data":
+      return "Platform returned no runtime data";
+    case "device_not_found":
+      return "No matching platform device was found";
+    case "device_offline":
+      return "Platform reports the selected device is offline or unknown";
+    case "metadata_unrecognized":
+      return "Platform runtime metadata could not identify return-air temperature";
+  }
+}
+
+function appendPlatformStage(
+  timeline: TimelineBuilder,
+  stage: PlatformFailureStage,
+  status: TimelineStatus,
+  detail: string
+): void {
+  switch (stage) {
+    case "platform_auth":
+      timeline.platformAuth(status, detail);
+      break;
+    case "platform_search":
+      timeline.platformSearch(status, detail);
+      break;
+    case "platform_detail":
+      timeline.platformDetail(status, detail);
+      break;
+    case "platform_runtime_read":
+      timeline.platformRuntimeRead(status, detail);
+      break;
+  }
+}
+
+function contextFromPlatformResult(result: PlatformProposalAmbiguous | PlatformProposalUnavailable): SelectedDeviceContext {
+  if (result.kind === "ambiguous") {
+    return {
+      devices: [],
+      dataItems: [],
+      controlItems: [],
+      candidates: result.candidates
+    };
+  }
+
+  return {
+    devices: result.device ? [result.device] : [],
+    dataItems: [],
+    controlItems: [],
+    candidates: result.candidates ?? []
+  };
+}
+
+function publicPlatformDataItems(result: PlatformProposalSuccess): SelectedDataItem[] {
+  if (result.device.type !== "air_conditioner") {
+    return result.dataItems;
+  }
+
+  if (result.returnAirTemperature === undefined) {
+    return result.dataItems.filter((item) => !isSupplyAirTemperatureDataItem(item));
+  }
+
+  return result.dataItems.filter((item) => isSwitchDataItem(item) || isReturnAirTemperatureDataItem(item));
+}
+
+function platformSearchStepStatus(result: PlatformProposalAmbiguous | PlatformProposalUnavailable): "completed" | "blocked" {
+  if (result.kind === "ambiguous") {
+    return "blocked";
+  }
+
+  const stage = platformFailureStage(result);
+
+  return stage === "platform_search" || stage === "platform_auth"
+    ? "blocked"
+    : "completed";
+}
+
+function platformDetailStepStatus(result: PlatformProposalAmbiguous | PlatformProposalUnavailable): "planned" | "completed" | "blocked" {
+  if (result.kind === "ambiguous") {
+    return "planned";
+  }
+
+  const stage = platformFailureStage(result);
+  if (stage === "platform_runtime_read") {
+    return "completed";
+  }
+
+  return stage === "platform_detail" ? "blocked" : "planned";
 }
 
 function formatProposalParseError(error: unknown): string {

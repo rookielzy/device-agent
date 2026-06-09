@@ -15,6 +15,10 @@ describe("TimelineBuilder", () => {
     timeline.serviceValidation("succeeded", "Validated proposal");
     timeline.deviceResolution("succeeded", "Resolved device");
     timeline.simulatedRead("succeeded", "Read simulated values");
+    timeline.platformAuth("succeeded", "Authenticated platform request");
+    timeline.platformSearch("succeeded", "Searched platform equipment");
+    timeline.platformDetail("succeeded", "Read platform detail");
+    timeline.platformRuntimeRead("succeeded", "Read platform runtime");
     timeline.confirmationRequired("Waiting for confirmation");
     timeline.confirmationReceived("succeeded", "User confirmed");
     timeline.simulatedExecution("succeeded", "Applied stored control");
@@ -29,10 +33,14 @@ describe("TimelineBuilder", () => {
       "evt-006",
       "evt-007",
       "evt-008",
-      "evt-009"
+      "evt-009",
+      "evt-010",
+      "evt-011",
+      "evt-012",
+      "evt-013"
     ]);
     expect(timeline.events.every((event) => timelineEventSchema.safeParse(event).success)).toBe(true);
-    expect(timeline.events.map((event) => event.at)).toEqual(Array(9).fill("2026-06-07T09:00:00.000Z"));
+    expect(timeline.events.map((event) => event.at)).toEqual(Array(13).fill("2026-06-07T09:00:00.000Z"));
   });
 
   it("returns defensive event snapshots", () => {
