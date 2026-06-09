@@ -86,6 +86,61 @@ describe("LangChainDeepSeekInterpreter contract", () => {
     expect(JSON.stringify(invalid)).not.toContain("tool_calls");
   });
 
+  it("parses valid proposal JSON from final LangChain assistant messages", async () => {
+    const proposal = await createInterpreter({
+      messages: [
+        {
+          content: "I checked the tools."
+        },
+        {
+          content: JSON.stringify(livingRoomStatusProposal)
+        }
+      ]
+    }).interpret({
+      originalText: sampleTextFor("ae1-living-room-ac-status")
+    });
+
+    expect(proposal).toEqual(livingRoomStatusProposal);
+  });
+
+  it("parses proposal JSON from common assistant content block shapes", async () => {
+    const proposal = await createInterpreter({
+      messages: [
+        {
+          content: [
+            {
+              type: "text",
+              text: `\`\`\`json\n${JSON.stringify(hallwayLightOnProposal)}\n\`\`\``
+            }
+          ]
+        }
+      ]
+    }).interpret({
+      originalText: sampleTextFor("ae2-hallway-light-on")
+    });
+
+    expect(proposal).toEqual(hallwayLightOnProposal);
+  });
+
+  it("maps malformed assistant JSON to sanitized parse_failure", async () => {
+    const proposal = await createInterpreter({
+      messages: [
+        {
+          content: "raw provider payload tool_calls { not-json"
+        }
+      ]
+    }).interpret({
+      originalText: sampleTextFor("ae2-hallway-light-on")
+    });
+
+    expect(proposal).toMatchObject({
+      kind: "parse_failure",
+      reason: "structured_output_parse_failure",
+      detail: "LangChain agent returned content that was not valid proposal JSON"
+    });
+    expect(JSON.stringify(proposal)).not.toContain("tool_calls");
+  });
+
   it("maps Zod validation errors to parse_failure without provider payloads", async () => {
     const interpreter = createInterpreter({
       error: new ZodError([])
@@ -260,8 +315,10 @@ describe("LangChainDeepSeekInterpreter contract", () => {
     expect(DEEPSEEK_INTERPRETER_SYSTEM_PROMPT).toContain("ambiguous");
     expect(DEEPSEEK_INTERPRETER_SYSTEM_PROMPT).toContain("never executes");
     expect(DEEPSEEK_INTERPRETER_SYSTEM_PROMPT).toContain("structured output");
+    expect(DEEPSEEK_INTERPRETER_SYSTEM_PROMPT).toContain("Return a single JSON object only");
     expect(DEEPSEEK_PLATFORM_INTERPRETER_SYSTEM_PROMPT).toContain("read-only");
     expect(DEEPSEEK_PLATFORM_INTERPRETER_SYSTEM_PROMPT).toContain("return-air temperature");
+    expect(DEEPSEEK_PLATFORM_INTERPRETER_SYSTEM_PROMPT).toContain("do not copy those fields");
 
     expect(agentProposalSchema.safeParse(livingRoomStatusProposal).success).toBe(true);
     expect(agentProposalSchema.safeParse({
@@ -284,6 +341,18 @@ describe("LangChainDeepSeekInterpreter contract", () => {
 
 function createInterpreter(options: {
   structuredResponse?: unknown;
+  messages?: Array<{
+    content?: unknown;
+    text?: unknown;
+    kwargs?: {
+      content?: unknown;
+    };
+    lc_kwargs?: {
+      content?: unknown;
+    };
+  }>;
+  output?: unknown;
+  content?: unknown;
   error?: Error;
   deviceService?: SimulatedDeviceService;
   calls?: Parameters<AgentInvoker["invoke"]>[0][];
@@ -297,7 +366,10 @@ function createInterpreter(options: {
       }
 
       return {
-        ...(options.structuredResponse !== undefined ? { structuredResponse: options.structuredResponse } : {})
+        ...(options.structuredResponse !== undefined ? { structuredResponse: options.structuredResponse } : {}),
+        ...(options.messages !== undefined ? { messages: options.messages } : {}),
+        ...(options.output !== undefined ? { output: options.output } : {}),
+        ...(options.content !== undefined ? { content: options.content } : {})
       };
     }
   };

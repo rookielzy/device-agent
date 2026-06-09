@@ -194,10 +194,10 @@ Live smoke validation is manual and opt-in. `tests/agent/langchain-live-smoke.te
 `src/agent/agent-interpreter.ts` is the provider-neutral boundary consumed by `TaskService`. The deterministic fake interpreter and the LangChain DeepSeek adapter both return normalized `AgentProposal` values:
 
 - Fake mode maps representative sample utterances without network access or credentials.
-- DeepSeek mode uses LangChain `createAgent`, `ChatDeepSeek`, simulated-device tools, and structured output.
+- DeepSeek mode uses LangChain `createAgent`, `ChatDeepSeek`, device tools, DeepSeek JSON output mode, and local schema validation.
 - DeepSeek platform mode uses read-only platform tools for project or area listing, equipment search, equipment detail, pivotal runtime parameters, and air-conditioner status lookup.
 - Device tools can resolve/read status and propose controls, but they must not apply controls or create pending controls.
-- Malformed or missing structured model output becomes a `parse_failure` proposal.
+- Malformed or missing structured JSON model output becomes a `parse_failure` proposal.
 - Public task results must not include LangChain messages, tool calls, run ids, raw DeepSeek payloads, or provider metadata.
 
 ## V1 Boundaries

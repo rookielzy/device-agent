@@ -8,7 +8,6 @@ import {
   DEEPSEEK_PLATFORM_INTERPRETER_SYSTEM_PROMPT
 } from "./agent-prompts.js";
 import {
-  agentProposalSchema,
   parseAgentProposal,
   type AgentProposal
 } from "./agent-schemas.js";
@@ -20,7 +19,21 @@ import type { PlatformCapabilityService } from "../domain/platform/platform-capa
 export type AgentInvoker = {
   invoke(input: { messages: Array<{ role: "user"; content: string }> }): Promise<{
     structuredResponse?: unknown;
+    messages?: AgentMessageLike[];
+    output?: unknown;
+    content?: unknown;
   }>;
+};
+
+type AgentMessageLike = {
+  content?: unknown;
+  text?: unknown;
+  kwargs?: {
+    content?: unknown;
+  };
+  lc_kwargs?: {
+    content?: unknown;
+  };
 };
 
 export type LangChainDeepSeekInterpreterOptions = {
@@ -75,14 +88,18 @@ export class LangChainDeepSeekInterpreter implements AgentInterpreter {
         ]
       });
 
-      if (result.structuredResponse === undefined) {
-        return parseFailure("missing_structured_response", "LangChain agent did not return structuredResponse");
-      }
-
-      return parseAgentProposal(result.structuredResponse);
+      return parseAgentResult(result);
     } catch (error) {
       if (error instanceof ZodError) {
         return parseFailure("schema_invalid", error.issues[0]?.message ?? "structured proposal failed validation");
+      }
+
+      if (error instanceof MissingModelProposalError) {
+        return parseFailure("missing_structured_response", "LangChain agent did not return structuredResponse or assistant JSON content");
+      }
+
+      if (error instanceof ModelOutputJsonParseError) {
+        return parseFailure("structured_output_parse_failure", "LangChain agent returned content that was not valid proposal JSON");
       }
 
       if (error instanceof StructuredOutputParsingError) {
@@ -102,14 +119,18 @@ export function createDeepSeekAgent(input: CreateDeepSeekAgentInput): AgentInvok
   const model = new ChatDeepSeek({
     apiKey: input.apiKey,
     model: input.model,
-    temperature: 0
+    temperature: 0,
+    modelKwargs: {
+      response_format: {
+        type: "json_object"
+      }
+    }
   });
 
   return createAgent({
     model,
     tools: input.tools,
-    systemPrompt: input.systemPrompt,
-    responseFormat: agentProposalSchema
+    systemPrompt: input.systemPrompt
   });
 }
 
@@ -130,4 +151,116 @@ function parseFailure(reason: string, detail: string): AgentProposal {
     detail,
     confidence: 0
   };
+}
+
+function parseAgentResult(result: Awaited<ReturnType<AgentInvoker["invoke"]>>): AgentProposal {
+  if (result.structuredResponse !== undefined) {
+    return parseAgentProposal(result.structuredResponse);
+  }
+
+  const content = extractAgentContent(result);
+  if (content === undefined) {
+    throw new MissingModelProposalError();
+  }
+
+  return parseAgentProposal(parseJsonContent(content));
+}
+
+function extractAgentContent(result: Awaited<ReturnType<AgentInvoker["invoke"]>>): unknown {
+  if (result.output !== undefined) {
+    return result.output;
+  }
+
+  if (result.content !== undefined) {
+    return result.content;
+  }
+
+  const lastMessage = result.messages?.[result.messages.length - 1];
+  if (!lastMessage) {
+    return undefined;
+  }
+
+  return lastMessage.content ?? lastMessage.text ?? lastMessage.kwargs?.content ?? lastMessage.lc_kwargs?.content;
+}
+
+function parseJsonContent(content: unknown): unknown {
+  if (isRecord(content)) {
+    return content;
+  }
+
+  const text = contentToText(content);
+  if (!text) {
+    throw new MissingModelProposalError();
+  }
+
+  try {
+    return JSON.parse(jsonObjectText(text));
+  } catch {
+    throw new ModelOutputJsonParseError();
+  }
+}
+
+function contentToText(content: unknown): string | undefined {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+
+  const text = content.flatMap((part) => {
+    if (typeof part === "string") {
+      return [part];
+    }
+
+    if (!isRecord(part)) {
+      return [];
+    }
+
+    if (typeof part.text === "string") {
+      return [part.text];
+    }
+
+    if (typeof part.content === "string") {
+      return [part.content];
+    }
+
+    return [];
+  }).join("");
+
+  return text.trim() ? text : undefined;
+}
+
+function jsonObjectText(text: string): string {
+  let trimmed = text.trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fenced?.[1]) {
+    trimmed = fenced[1].trim();
+  }
+
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    return trimmed;
+  }
+
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+
+  return start >= 0 && end > start ? trimmed.slice(start, end + 1) : trimmed;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+class MissingModelProposalError extends Error {
+  constructor() {
+    super("Missing model proposal content");
+  }
+}
+
+class ModelOutputJsonParseError extends Error {
+  constructor() {
+    super("Model proposal content was not valid JSON");
+  }
 }
