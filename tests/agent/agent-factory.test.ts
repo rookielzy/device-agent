@@ -25,6 +25,7 @@ describe("createAgentInterpreter", () => {
       host: "127.0.0.1",
       port: 3000,
       interpreterMode: "deepseek",
+      deviceCapabilityMode: "simulated",
       deepseek: {
         apiKey: "test-key",
         model: "deepseek-test"
@@ -63,6 +64,7 @@ describe("createAgentInterpreter", () => {
       host: "127.0.0.1",
       port: 3000,
       interpreterMode: "deepseek",
+      deviceCapabilityMode: "simulated",
       deepseek: {
         apiKey: "test-key",
         model: "deepseek-test"
@@ -108,6 +110,99 @@ describe("createAgentInterpreter", () => {
     });
 
     expect(calls).toEqual(["readStatus"]);
+  });
+
+  it("passes platform service into DeepSeek tool construction when platform mode is configured", async () => {
+    const calls: string[] = [];
+    const config: AppConfig = {
+      host: "127.0.0.1",
+      port: 3000,
+      interpreterMode: "deepseek",
+      deviceCapabilityMode: "platform",
+      deepseek: {
+        apiKey: "test-key",
+        model: "deepseek-test"
+      },
+      platform: {
+        userCenterBaseUrl: "https://user.example.test",
+        iotBaseUrl: "https://iot.example.test",
+        validationMobile: "13800000000",
+        validationPassword: "secret",
+        validationProjectId: "270544150790145",
+        requestTimeoutMs: 5000
+      },
+      enableDebugSimulatedDevices: false
+    };
+    const platformService = {
+      async listProjectsOrAreas() {
+        return {
+          kind: "project_list_success" as const,
+          projects: []
+        };
+      },
+      async searchDevices() {
+        return {
+          kind: "search_success" as const,
+          raw: [],
+          candidates: []
+        };
+      },
+      async getEquipmentDetail() {
+        return {
+          kind: "unavailable" as const,
+          reason: "platform_no_data" as const,
+          message: "No data",
+          stage: "platform_detail" as const
+        };
+      },
+      async getRuntimeParams() {
+        return [];
+      },
+      async readAirConditionerStatus() {
+        calls.push("readAirConditionerStatus");
+
+        return {
+          kind: "unavailable" as const,
+          reason: "metadata_unrecognized" as const,
+          message: "metadata unavailable",
+          stage: "platform_runtime_read" as const
+        };
+      }
+    };
+    let readStatusTool: { invoke(input: unknown): Promise<unknown> } | undefined;
+    const interpreter = createAgentInterpreter({
+      config,
+      platformService,
+      deepseekAgentFactory: (input) => {
+        readStatusTool = input.tools.find((candidate) => candidate.name === "read_platform_air_conditioner_status") as typeof readStatusTool;
+
+        return {
+          async invoke() {
+            await readStatusTool!.invoke({
+              room: "财务室",
+              deviceType: "air_conditioner"
+            });
+
+            return {
+              structuredResponse: {
+                kind: "platform_status_query",
+                result: {
+                  kind: "unavailable",
+                  reason: "metadata_unrecognized",
+                  stage: "platform_runtime_read"
+                }
+              }
+            };
+          }
+        };
+      }
+    });
+
+    await interpreter.interpret({
+      originalText: "A 项目 1 楼财务室空调开着吗，现在多少度"
+    });
+
+    expect(calls).toEqual(["readAirConditionerStatus"]);
   });
 
   it("keeps unknown interpreter modes rejected by parseEnv", () => {

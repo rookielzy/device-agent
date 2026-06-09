@@ -1,6 +1,6 @@
 # Agent Plan Contract V1
 
-The Agent Plan Contract is the public response shape for the text-first IoT Agent service. It describes what the service understood, which simulated device context it selected, what reply should be shown to the user, and which timeline events explain the outcome.
+The Agent Plan Contract is the public response shape for the text-first IoT Agent service. It describes what the service understood, which device context it selected, what reply should be shown to the user, and which timeline events explain the outcome. The default source is still simulated devices; an internal real-platform read mode can also return provider-neutral status-query task results.
 
 Zod schemas in `src/contracts/task-contract.ts` and `src/contracts/device-contract.ts` are the canonical contract source. Route handlers, domain services, fixtures, and later client renderers should validate against those schemas instead of redefining the response shape.
 
@@ -38,12 +38,12 @@ A task result contains:
 - `originalText`: the user text that started the task.
 - `classification`: one of `status_query`, `control_request`, `ambiguous`, or `unsupported`.
 - `executionState`: one of `completed`, `pending_confirmation`, `needs_clarification`, `unavailable`, `rejected`, or `failed`.
-- `outcomeReason`: machine-readable reason for the outcome. Successful and ordinary pending tasks use `none`; blocked outcomes use `ambiguous_target`, `device_not_found`, `device_offline`, `unsupported_request`, `unsupported_data_item`, `unsupported_control_item`, `read_only_control`, `invalid_control_value`, `parse_failure`, `pending_control_missing`, `pending_control_expired`, `pending_control_already_confirmed`, `pending_control_already_rejected`, `control_rejected`, `confirmation_failed`, or `service_error`.
+- `outcomeReason`: machine-readable reason for the outcome. Successful and ordinary pending tasks use `none`; blocked outcomes use `ambiguous_target`, `device_not_found`, `device_offline`, `unsupported_request`, `unsupported_data_item`, `unsupported_control_item`, `read_only_control`, `invalid_control_value`, `parse_failure`, `pending_control_missing`, `pending_control_expired`, `pending_control_already_confirmed`, `pending_control_already_rejected`, `control_rejected`, `confirmation_failed`, `platform_auth_failed`, `platform_timeout`, `platform_error`, `platform_no_data`, `metadata_unrecognized`, or `service_error`.
 - `reply`: user-facing response text.
 - `plan`: structured understanding with a summary, confidence score, plan steps, and optional ambiguity reason.
-- `selectedContext`: simulated devices, selected readable data items, selected writable controls, and ambiguity candidates.
+- `selectedContext`: selected device contexts, selected readable data items, selected writable controls, and ambiguity candidates. Real-platform reads reuse the provider-neutral device context shape and must not expose raw Java payloads.
 - `pendingControl`: present only when a control request is waiting for confirmation.
-- `timeline`: ordered service, model, client, and simulated-device events.
+- `timeline`: ordered service, model, client, simulated-device, and platform events.
 
 Example status-query payload:
 
@@ -109,11 +109,13 @@ Clients should use `outcomeReason` for branching and analytics instead of parsin
 
 Timeline events use stable `stage`, `source`, and `status` values so failures are attributable:
 
-- Stages: `request_received`, `model_interpretation`, `service_validation`, `device_resolution`, `simulated_read`, `confirmation_required`, `confirmation_received`, `simulated_execution`, `final_outcome`.
-- Sources: `client`, `model`, `service`, `simulated_device`.
+- Stages: `request_received`, `model_interpretation`, `service_validation`, `device_resolution`, `simulated_read`, `platform_auth`, `platform_search`, `platform_detail`, `platform_runtime_read`, `confirmation_required`, `confirmation_received`, `simulated_execution`, `final_outcome`.
+- Sources: `client`, `model`, `service`, `simulated_device`, `platform`.
 - Statuses: `started`, `succeeded`, `waiting`, `blocked`, `failed`.
 
 Model interpretation, service validation, and simulated device results should be separate events. This keeps LangChain proposals distinct from service-owned decisions.
+
+Platform query mode uses `platform_search`, `platform_detail`, and `platform_runtime_read` to attribute read-only Java-platform interactions. Platform authentication failures use `platform_auth`. Timeline detail text must stay sanitized and must not include tokens, passwords, raw request URLs, or platform auth headers.
 
 ## Pending Controls
 
@@ -147,12 +149,15 @@ The debug snapshot endpoint returns these same simulated device contexts in a `{
 
 The public contract is provider-neutral. Clients do not need LangChain messages, tool-call objects, run objects, DeepSeek raw payloads, or model-provider response metadata. LangChain output can be used by an adapter, but service-side code must normalize and validate it before returning a task result.
 
+Internal real-platform mode may provide original Java response fields to model-visible platform tools for V1 validation, but public `TaskResult` values expose only selected device context, selected facts, machine-readable reasons, and sanitized timeline attribution. Raw Java payloads, bearer tokens, refresh tokens, validation passwords, `x-user-header` values, request URLs, and provider-specific tool-call objects must not appear in public responses.
+
 ## Environment Modes
 
 Local development defaults to fake interpreter mode:
 
 ```env
 AGENT_INTERPRETER_MODE=fake
+AGENT_DEVICE_CAPABILITY_MODE=simulated
 DEEPSEEK_MODEL=deepseek-v4-flash
 ```
 
@@ -166,7 +171,23 @@ DEEPSEEK_MODEL=deepseek-v4-flash
 
 Configuration parsing rejects live DeepSeek mode when the API key is missing.
 
-Live smoke validation is manual and opt-in. `tests/agent/langchain-live-smoke.test.ts` runs only when both `DEEPSEEK_LIVE_SMOKE=1` and `DEEPSEEK_API_KEY` are present, then checks that one status query and one control request parse through the provider-neutral proposal schema. Network access, model availability, latency, and provider cost are outside the default regression suite.
+Real-platform query mode is opt-in and requires DeepSeek plus platform validation configuration:
+
+```env
+AGENT_INTERPRETER_MODE=deepseek
+AGENT_DEVICE_CAPABILITY_MODE=platform
+DEEPSEEK_API_KEY=...
+PLATFORM_USER_CENTER_BASE_URL=...
+PLATFORM_IOT_BASE_URL=...
+PLATFORM_VALIDATION_MOBILE=...
+PLATFORM_VALIDATION_PASSWORD=...
+PLATFORM_VALIDATION_PROJECT_ID=270544150790145
+PLATFORM_REQUEST_TIMEOUT_MS=5000
+```
+
+This mode is internal read-only validation for Java-platform status queries and is limited to runtime hosts `127.0.0.1` or `localhost`. It uses the configured validation account rather than per-user session forwarding, defaults to project `270544150790145`, and supports the target air-conditioner status question by searching equipment, reading equipment detail, and reading pivotal runtime parameters. Device control against real equipment remains out of scope.
+
+Live smoke validation is manual and opt-in. `tests/agent/langchain-live-smoke.test.ts` runs simulated DeepSeek smoke only when both `DEEPSEEK_LIVE_SMOKE=1` and `DEEPSEEK_API_KEY` are present, then checks that one status query and one control request parse through the provider-neutral proposal schema. Platform live smoke requires `PLATFORM_LIVE_SMOKE=1`, `DEEPSEEK_API_KEY`, and all platform credential/base-url variables. Network access, model availability, Java-platform availability, latency, and provider cost are outside the default regression suite.
 
 ## Interpreter Adapter Boundary
 
@@ -174,13 +195,14 @@ Live smoke validation is manual and opt-in. `tests/agent/langchain-live-smoke.te
 
 - Fake mode maps representative sample utterances without network access or credentials.
 - DeepSeek mode uses LangChain `createAgent`, `ChatDeepSeek`, simulated-device tools, and structured output.
+- DeepSeek platform mode uses read-only platform tools for project or area listing, equipment search, equipment detail, pivotal runtime parameters, and air-conditioner status lookup.
 - Device tools can resolve/read status and propose controls, but they must not apply controls or create pending controls.
 - Malformed or missing structured model output becomes a `parse_failure` proposal.
 - Public task results must not include LangChain messages, tool calls, run ids, raw DeepSeek payloads, or provider metadata.
 
 ## V1 Boundaries
 
-V1 contracts describe simulated devices only. They do not promise real IoT adapter behavior, production persistence, voice input or output, automatic device control, frontend rendering, household permission checks, or real audit-retention policy.
+V1 contracts primarily describe simulated devices plus an internal real-platform read mode. They do not promise production real IoT adapter behavior, production persistence, voice input or output, automatic device control, frontend rendering, household permission checks, or real audit-retention policy.
 
 Known operational limits remain outside this slice:
 
@@ -188,3 +210,4 @@ Known operational limits remain outside this slice:
 - Runtime request or handler timeout hardening is deferred follow-up work.
 - Authentication, authorization, CORS, rate limiting, production observability, and deployment runbooks are not part of V1.
 - The debug simulated-device endpoint is for local developer inspection only and is not a real adapter management surface.
+- Per-user platform auth forwarding, raw Java payload curation, platform write APIs, and production rollout hardening remain follow-up work.

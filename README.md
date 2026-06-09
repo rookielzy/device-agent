@@ -23,9 +23,16 @@ Useful environment variables are:
 HOST=127.0.0.1
 PORT=3000
 AGENT_INTERPRETER_MODE=fake
+AGENT_DEVICE_CAPABILITY_MODE=simulated
 DEEPSEEK_API_KEY=
 DEEPSEEK_MODEL=deepseek-v4-flash
 ENABLE_DEBUG_SIMULATED_DEVICES=false
+PLATFORM_USER_CENTER_BASE_URL=
+PLATFORM_IOT_BASE_URL=
+PLATFORM_VALIDATION_MOBILE=
+PLATFORM_VALIDATION_PASSWORD=
+PLATFORM_VALIDATION_PROJECT_ID=270544150790145
+PLATFORM_REQUEST_TIMEOUT_MS=5000
 ```
 
 `GET /debug/simulated-devices` is exposed automatically for localhost runtime hosts. Set `ENABLE_DEBUG_SIMULATED_DEVICES=true` only when deliberately exposing that developer endpoint from another host binding.
@@ -106,6 +113,22 @@ DEEPSEEK_MODEL=deepseek-v4-flash
 
 The LangChain adapter uses `ChatDeepSeek`, simulated-device tools, and structured output. It returns only provider-neutral proposals to `TaskService`; controls are proposed for later confirmation and are not executed by the adapter.
 
+Internal real-platform query mode is a separate opt-in device capability source:
+
+```env
+AGENT_INTERPRETER_MODE=deepseek
+AGENT_DEVICE_CAPABILITY_MODE=platform
+DEEPSEEK_API_KEY=...
+PLATFORM_USER_CENTER_BASE_URL=...
+PLATFORM_IOT_BASE_URL=...
+PLATFORM_VALIDATION_MOBILE=...
+PLATFORM_VALIDATION_PASSWORD=...
+PLATFORM_VALIDATION_PROJECT_ID=270544150790145
+PLATFORM_REQUEST_TIMEOUT_MS=5000
+```
+
+This mode is for local validation of read-only Java-platform queries, such as `A 项目 1 楼财务室空调开着吗，现在多少度`. It is limited to `HOST=127.0.0.1` or `HOST=localhost`, uses configured validation credentials, the fixed project id by default, and platform tools for equipment search, detail, and pivotal runtime parameters. V1 may pass raw Java response fields into model tool context, so do not use it as a production user-facing mode or commit validation passwords.
+
 ## Tests
 
 Default checks are offline:
@@ -121,13 +144,19 @@ Optional live smoke validation requires credentials and an explicit flag:
 DEEPSEEK_LIVE_SMOKE=1 DEEPSEEK_API_KEY=... pnpm vitest run tests/agent/langchain-live-smoke.test.ts
 ```
 
+Platform live smoke is also gated and requires both model and platform credentials:
+
+```bash
+PLATFORM_LIVE_SMOKE=1 DEEPSEEK_API_KEY=... PLATFORM_USER_CENTER_BASE_URL=... PLATFORM_IOT_BASE_URL=... PLATFORM_VALIDATION_MOBILE=... PLATFORM_VALIDATION_PASSWORD=... pnpm vitest run tests/agent/langchain-live-smoke.test.ts
+```
+
 The live smoke path validates coarse proposal categories only; network access, model availability, and provider cost are outside the default regression suite.
 
 ## V1 Limits
 
 This prototype is simulated and in-memory. Current V1 boundaries are deliberate:
 
-- No real IoT adapter, device-provider runbook, or production mutation workflow.
+- Real-platform mode is internal read-only validation only; no production mutation workflow or per-user platform session forwarding.
 - No persistent task store; unbounded in-memory task growth remains follow-up work.
 - No request or handler timeout hardening beyond Fastify defaults.
 - Authentication, authorization, CORS, rate limiting, production observability, and deployment guidance are not part of V1.

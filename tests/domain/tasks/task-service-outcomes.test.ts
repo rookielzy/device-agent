@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { agentProposalSchema } from "../../../src/agent/agent-interpreter.js";
 import { taskResultSchema } from "../../../src/contracts/task-contract.js";
 import type { SimulatedDeviceContext } from "../../../src/contracts/device-contract.js";
+import type { AgentProposal } from "../../../src/agent/agent-interpreter.js";
 import { SimulatedDeviceService } from "../../../src/domain/devices/simulated-device-service.js";
 import { TaskService } from "../../../src/domain/tasks/task-service.js";
 import {
@@ -203,4 +204,260 @@ describe("TaskService status and blocked outcomes", () => {
     expect(invalidShape.outcomeReason).toBe("parse_failure");
     expect(taskResultSchema.safeParse(invalidShape).success).toBe(true);
   });
+
+  it("creates a completed provider-neutral platform status task", async () => {
+    const service = createServiceForProposal(platformSuccessProposal);
+
+    const result = await service.createTask("A 项目 1 楼财务室空调开着吗，现在多少度");
+
+    expect(taskResultSchema.safeParse(result).success).toBe(true);
+    expect(result).toMatchObject({
+      classification: "status_query",
+      executionState: "completed",
+      outcomeReason: "none"
+    });
+    expect(result.reply).toContain("23.5");
+    expect(result.selectedContext.devices[0]).toMatchObject({
+      deviceId: "99887766",
+      displayName: "财务室空调",
+      type: "air_conditioner"
+    });
+    expect(result.selectedDataItems.map((item) => [item.name, item.value])).toEqual([
+      ["开关状态", true],
+      ["回风温度", 23.5]
+    ]);
+    expect(result.timeline.map((event) => event.stage)).toEqual([
+      "request_received",
+      "model_interpretation",
+      "service_validation",
+      "platform_search",
+      "platform_detail",
+      "platform_runtime_read",
+      "final_outcome"
+    ]);
+    expect(result.timeline.map((event) => event.source)).toContain("platform");
+    expectProviderNeutral(result);
+  });
+
+  it("maps ambiguous platform proposals to clarification with candidate context", async () => {
+    const service = createServiceForProposal({
+      kind: "platform_status_query",
+      result: {
+        kind: "ambiguous",
+        reason: "ambiguous_target",
+        candidates: [
+          platformDevice("99887766", "财务室空调"),
+          platformDevice("99887767", "财务室备用空调")
+        ],
+        stage: "platform_search"
+      }
+    });
+
+    const result = await service.createTask("财务室空调现在多少度");
+
+    expect(result.executionState).toBe("needs_clarification");
+    expect(result.outcomeReason).toBe("ambiguous_target");
+    expect(result.selectedContext.candidates.map((candidate) => candidate.deviceId)).toEqual(["99887766", "99887767"]);
+    expect(result.selectedDataItems).toEqual([]);
+    expect(result.timeline.some((event) => event.stage === "platform_search" && event.status === "blocked")).toBe(true);
+  });
+
+  it("maps metadata-unrecognized, timeout, and no-data platform proposals to sanitized non-success outcomes", async () => {
+    const metadata = await createServiceForProposal({
+      kind: "platform_status_query",
+      result: {
+        kind: "unavailable",
+        reason: "metadata_unrecognized",
+        device: platformDevice("99887766", "财务室空调"),
+        candidates: [],
+        stage: "platform_runtime_read"
+      }
+    }).createTask("财务室空调现在多少度");
+    const timeout = await createServiceForProposal({
+      kind: "platform_status_query",
+      result: {
+        kind: "unavailable",
+        reason: "platform_timeout",
+        candidates: [],
+        stage: "platform_search"
+      }
+    }).createTask("财务室空调现在多少度");
+    const noData = await createServiceForProposal({
+      kind: "platform_status_query",
+      result: {
+        kind: "unavailable",
+        reason: "platform_no_data",
+        device: platformDevice("99887766", "财务室空调"),
+        candidates: [],
+        stage: "platform_runtime_read"
+      }
+    }).createTask("财务室空调现在多少度");
+    const auth = await createServiceForProposal({
+      kind: "platform_status_query",
+      result: {
+        kind: "unavailable",
+        reason: "platform_auth_failed",
+        candidates: [],
+        stage: "platform_auth"
+      }
+    }).createTask("财务室空调现在多少度");
+    const platformError = await createServiceForProposal({
+      kind: "platform_status_query",
+      result: {
+        kind: "unavailable",
+        reason: "platform_error",
+        device: platformDevice("99887766", "财务室空调"),
+        candidates: [],
+        stage: "platform_detail"
+      }
+    }).createTask("财务室空调现在多少度");
+
+    expect(metadata).toMatchObject({
+      executionState: "unavailable",
+      outcomeReason: "metadata_unrecognized"
+    });
+    expect(metadata.selectedDataItems).toEqual([]);
+    expect(timeout).toMatchObject({
+      executionState: "unavailable",
+      outcomeReason: "platform_timeout"
+    });
+    expect(noData).toMatchObject({
+      executionState: "unavailable",
+      outcomeReason: "platform_no_data"
+    });
+    expect(auth).toMatchObject({
+      executionState: "failed",
+      outcomeReason: "platform_auth_failed"
+    });
+    expect(platformError).toMatchObject({
+      executionState: "failed",
+      outcomeReason: "platform_error"
+    });
+    expect(auth.timeline.some((event) => event.stage === "platform_auth" && event.status === "failed")).toBe(true);
+    expect(platformError.timeline.some((event) => event.stage === "platform_detail" && event.status === "failed")).toBe(true);
+    expect(noData.timeline.some((event) => event.stage === "platform_runtime_read" && event.status === "blocked")).toBe(true);
+    expectProviderNeutral(metadata);
+    expectProviderNeutral(timeout);
+    expectProviderNeutral(noData);
+    expectProviderNeutral(auth);
+    expectProviderNeutral(platformError);
+  });
 });
+
+const platformSuccessProposal: AgentProposal = {
+  kind: "platform_status_query",
+  result: {
+    kind: "platform_status_success",
+    device: {
+      ...platformDevice("99887766", "财务室空调"),
+      readableValues: [
+        {
+          itemId: "powerswitch",
+          name: "开关状态",
+          metadata: {
+            kind: "boolean",
+            label: "开关状态"
+          },
+          value: true,
+          freshness: "fresh"
+        },
+        {
+          itemId: "returnairtemperature",
+          name: "回风温度",
+          metadata: {
+            kind: "number",
+            label: "回风温度",
+            unit: "℃"
+          },
+          value: 23.5,
+          freshness: "fresh"
+        },
+        {
+          itemId: "supplyairtemperature",
+          name: "送风温度",
+          metadata: {
+            kind: "number",
+            label: "送风温度",
+            unit: "℃"
+          },
+          value: 18.2,
+          freshness: "fresh"
+        }
+      ]
+    },
+    dataItems: [
+      {
+        deviceId: "99887766",
+        itemId: "powerswitch",
+        name: "开关状态",
+        value: true,
+        metadata: {
+          kind: "boolean",
+          label: "开关状态"
+        },
+        freshness: "fresh"
+      },
+      {
+        deviceId: "99887766",
+        itemId: "returnairtemperature",
+        name: "回风温度",
+        value: 23.5,
+        metadata: {
+          kind: "number",
+          label: "回风温度",
+          unit: "℃"
+        },
+        freshness: "fresh"
+      },
+      {
+        deviceId: "99887766",
+        itemId: "supplyairtemperature",
+        name: "送风温度",
+        value: 18.2,
+        metadata: {
+          kind: "number",
+          label: "送风温度",
+          unit: "℃"
+        },
+        freshness: "fresh"
+      }
+    ],
+    switchState: true,
+    returnAirTemperature: 23.5,
+    runStatusHint: "running"
+  },
+  summary: "Answer finance-room air-conditioner status from real-platform runtime parameters.",
+  confidence: 0.9
+};
+
+function platformDevice(deviceId: string, displayName: string): SimulatedDeviceContext {
+  return {
+    deviceId,
+    displayName,
+    room: "财务室",
+    type: "air_conditioner",
+    availability: {
+      online: true
+    },
+    capabilities: ["platform_read", "read_air_conditioner_status"],
+    readableValues: [],
+    writableControls: []
+  };
+}
+
+function expectProviderNeutral(value: unknown): void {
+  const serialized = JSON.stringify(value);
+
+  for (const forbidden of [
+    "runtimeParams",
+    "serialNumber",
+    "gateway",
+    "access-token",
+    "refresh-token",
+    "password",
+    "tool_calls",
+    "DeepSeek"
+  ]) {
+    expect(serialized).not.toContain(forbidden);
+  }
+}

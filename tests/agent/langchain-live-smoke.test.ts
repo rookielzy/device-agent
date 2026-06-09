@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LangChainDeepSeekInterpreter } from "../../src/agent/langchain-deepseek-interpreter.js";
 import { agentProposalSchema } from "../../src/agent/agent-schemas.js";
-import { shouldRunDeepSeekLiveSmoke } from "../../src/agent/live-smoke.js";
+import { shouldRunDeepSeekLiveSmoke, shouldRunPlatformLiveSmoke } from "../../src/agent/live-smoke.js";
 import { sampleTextFor } from "../fixtures/sample-utterances.js";
 
 const shouldRunLiveSmoke = shouldRunDeepSeekLiveSmoke();
@@ -13,6 +13,22 @@ describe("DeepSeek live smoke gate", () => {
     expect(shouldRunDeepSeekLiveSmoke({ DEEPSEEK_LIVE_SMOKE: "1" })).toBe(false);
     expect(shouldRunDeepSeekLiveSmoke({ DEEPSEEK_API_KEY: "test-key" })).toBe(false);
     expect(shouldRunDeepSeekLiveSmoke({ DEEPSEEK_LIVE_SMOKE: "1", DEEPSEEK_API_KEY: "test-key" })).toBe(true);
+  });
+
+  it("requires explicit platform opt-in plus model and platform credentials for platform smoke", () => {
+    expect(shouldRunPlatformLiveSmoke({})).toBe(false);
+    expect(shouldRunPlatformLiveSmoke({
+      PLATFORM_LIVE_SMOKE: "1",
+      DEEPSEEK_API_KEY: "test-key"
+    })).toBe(false);
+    expect(shouldRunPlatformLiveSmoke({
+      PLATFORM_LIVE_SMOKE: "1",
+      DEEPSEEK_API_KEY: "test-key",
+      PLATFORM_USER_CENTER_BASE_URL: "https://user.example.test",
+      PLATFORM_IOT_BASE_URL: "https://iot.example.test",
+      PLATFORM_VALIDATION_MOBILE: "13800000000",
+      PLATFORM_VALIDATION_PASSWORD: "secret"
+    })).toBe(true);
   });
 });
 
